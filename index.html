@@ -32,6 +32,13 @@
       font-weight: bold;
       margin-bottom: 5px;
     }
+    /* Row configuration inside subdivision */
+    .row-config {
+      margin: 5px 0;
+    }
+    .rows-container {
+      margin-top: 5px;
+    }
     /* Row container styling */
     .seat-row-container {
       margin: 5px 0;
@@ -69,13 +76,15 @@
       margin: 2px 0;
     }
   </style>
+  <!-- Include html2canvas from a CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <h1>Auditorium Layout Editor</h1>
   <p>
-    Build your room by adding Divisions. Inside each division, add Subdivisions,
-    and then add Rows of Seats. In a row you can update the number of seats,
-    select individual seats (or drag over them), or select the entire row.
+    Build your room by adding Divisions. In each division, add a Subdivision and specify how many rows it should have.
+    Then, for each row, set the number of chairs and select individual seats (or drag–select them) or select the entire row.
+    When you finalize the layout, a PNG image will be generated from the layout.
   </p>
   
   <!-- Global Controls -->
@@ -87,14 +96,14 @@
   <div id="layout-editor"></div>
   
   <!-- Finalize Layout -->
-  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout</button>
+  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout &amp; Generate PNG</button>
   
   <script>
     // Global flag for drag selection
     let isDragging = false;
     document.addEventListener('mouseup', () => { isDragging = false; });
     
-    // Function to toggle a seat's active state
+    // Toggle a seat's active state
     function toggleSeat(seat) {
       if (seat.dataset.active === "false") {
         seat.dataset.active = "true";
@@ -105,43 +114,42 @@
       }
     }
     
-    // Create a seat element (individual seat)
+    // Create a single seat element
     function createSeat(index) {
       const seat = document.createElement('div');
       seat.classList.add('seat');
       seat.textContent = index + 1;
       seat.dataset.active = "false";
       
-      // Start drag selection on mousedown
+      // Begin drag selection on mousedown
       seat.addEventListener('mousedown', (e) => {
         isDragging = true;
         toggleSeat(seat);
       });
-      // If dragging and the mouse moves over a seat, select it if not already active
+      // If dragging and mouse hovers over a seat, toggle if not already active
       seat.addEventListener('mouseover', (e) => {
         if (isDragging && seat.dataset.active === "false") {
           toggleSeat(seat);
         }
       });
-      // Also allow a single click to toggle selection
+      // Allow a single click to toggle selection
       seat.addEventListener('click', (e) => {
         toggleSeat(seat);
       });
       return seat;
     }
     
-    // Create a row container with a header for changing the seat count
+    // Create a row container with controls for adjusting the number of chairs
     function createRow(seatCount) {
       const rowContainer = document.createElement('div');
       rowContainer.classList.add('seat-row-container');
       
-      // Row header with an input for seat count and buttons
+      // Row header with an input for seat count and control buttons
       const header = document.createElement('div');
       header.classList.add('row-header');
       
-      // Label and input field for seat count
       const label = document.createElement('span');
-      label.textContent = "Seats:";
+      label.textContent = "Chairs:";
       header.appendChild(label);
       
       const seatCountInput = document.createElement('input');
@@ -151,50 +159,50 @@
       seatCountInput.style.width = "50px";
       header.appendChild(seatCountInput);
       
-      // Update Row button (changes number of seats)
+      // Button to update the row (adjust number of chairs)
       const updateBtn = document.createElement('button');
       updateBtn.textContent = "Update Row";
       header.appendChild(updateBtn);
       
-      // Select Row button (toggle entire row)
+      // Button to toggle selection for the entire row
       const selectRowBtn = document.createElement('button');
       selectRowBtn.textContent = "Select Row";
       header.appendChild(selectRowBtn);
       
       rowContainer.appendChild(header);
       
-      // Container for the seats
+      // Container to hold the seats
       const rowDiv = document.createElement('div');
       rowDiv.classList.add('seat-row');
       rowContainer.appendChild(rowDiv);
       
-      // Function to render the row's seats based on a given count.
+      // Render initial seats for this row
       function renderSeats(newSeatCount) {
         const currentCount = rowDiv.children.length;
-        if(newSeatCount > currentCount) {
+        if (newSeatCount > currentCount) {
           // Add extra seats
-          for(let i = currentCount; i < newSeatCount; i++){
+          for (let i = currentCount; i < newSeatCount; i++) {
             const seat = createSeat(i);
             rowDiv.appendChild(seat);
           }
-        } else if(newSeatCount < currentCount) {
+        } else if (newSeatCount < currentCount) {
           // Remove seats from the end
-          for(let i = currentCount; i > newSeatCount; i--){
+          for (let i = currentCount; i > newSeatCount; i--) {
             rowDiv.removeChild(rowDiv.lastChild);
           }
         }
       }
       
-      // Create initial seats for this row
+      // Create the initial seats
       for (let i = 0; i < seatCount; i++) {
         const seat = createSeat(i);
         rowDiv.appendChild(seat);
       }
       
-      // Update Row button event: update the row if seat count changes
+      // Update Row button: change the number of seats based on input
       updateBtn.addEventListener('click', function() {
         const newCount = parseInt(seatCountInput.value);
-        if(isNaN(newCount) || newCount < 1) {
+        if (isNaN(newCount) || newCount < 1) {
           alert("Invalid seat count.");
           seatCountInput.value = rowDiv.children.length;
           return;
@@ -202,13 +210,12 @@
         renderSeats(newCount);
       });
       
-      // Select Row button event: toggle selection for all seats in the row
+      // Select Row button: toggle selection for all seats in the row
       selectRowBtn.addEventListener('click', function() {
         const seats = rowDiv.querySelectorAll('.seat');
-        // Check if all seats are already selected
         const allSelected = Array.from(seats).every(seat => seat.dataset.active === "true");
         seats.forEach(seat => {
-          if(allSelected) {
+          if (allSelected) {
             seat.dataset.active = "false";
             seat.classList.remove('active');
           } else {
@@ -221,44 +228,70 @@
       return rowContainer;
     }
     
-    // Create a new subdivision container
+    // Create a subdivision where you can specify the number of rows
     function createSubdivision() {
       const subdivision = document.createElement('div');
       subdivision.classList.add('subdivision');
       
-      // Subdivision header with name input and Add Row button
+      // Subdivision header with name input
       const header = document.createElement('div');
       header.classList.add('header');
-      
       const subDivNameInput = document.createElement('input');
       subDivNameInput.type = "text";
       subDivNameInput.placeholder = "Subdivision Name";
       header.appendChild(subDivNameInput);
+      subdivision.appendChild(header);
       
-      const addRowBtn = document.createElement('button');
-      addRowBtn.textContent = "Add Row";
-      addRowBtn.addEventListener('click', () => {
-        let seatCount = prompt("Enter number of seats for this row:");
-        seatCount = parseInt(seatCount);
-        if (!isNaN(seatCount) && seatCount > 0) {
-          const row = createRow(seatCount);
-          subdivision.appendChild(row);
-        } else {
-          alert("Invalid number of seats.");
+      // Row configuration panel: set number of rows for this subdivision
+      const rowConfigDiv = document.createElement('div');
+      rowConfigDiv.classList.add('row-config');
+      const rowsLabel = document.createElement('span');
+      rowsLabel.textContent = "Number of Rows:";
+      rowConfigDiv.appendChild(rowsLabel);
+      
+      const rowCountInput = document.createElement('input');
+      rowCountInput.type = "number";
+      rowCountInput.min = "1";
+      rowCountInput.value = "1"; // default to 1 row
+      rowCountInput.style.width = "50px";
+      rowConfigDiv.appendChild(rowCountInput);
+      
+      const generateRowsBtn = document.createElement('button');
+      generateRowsBtn.textContent = "Generate Rows";
+      rowConfigDiv.appendChild(generateRowsBtn);
+      
+      subdivision.appendChild(rowConfigDiv);
+      
+      // Container to hold the row elements
+      const rowsContainer = document.createElement('div');
+      rowsContainer.classList.add('rows-container');
+      subdivision.appendChild(rowsContainer);
+      
+      generateRowsBtn.addEventListener('click', function() {
+        const numRows = parseInt(rowCountInput.value);
+        if (isNaN(numRows) || numRows < 1) {
+          alert("Invalid number of rows.");
+          return;
+        }
+        // Clear any existing rows
+        rowsContainer.innerHTML = "";
+        // Create each row with a default of 10 chairs (modifiable later)
+        for (let i = 0; i < numRows; i++) {
+          const defaultSeatCount = 10;
+          const row = createRow(defaultSeatCount);
+          rowsContainer.appendChild(row);
         }
       });
-      header.appendChild(addRowBtn);
       
-      subdivision.appendChild(header);
       return subdivision;
     }
     
-    // Create a new division container
+    // Create a division container that can hold subdivisions
     function createDivision() {
       const division = document.createElement('div');
       division.classList.add('division');
       
-      // Division header with name input and Add Subdivision button
+      // Division header with name input and a button to add a subdivision
       const header = document.createElement('div');
       header.classList.add('header');
       
@@ -285,17 +318,20 @@
       document.getElementById('layout-editor').appendChild(division);
     });
     
-    // Finalize Layout: Gather hierarchy data and save to local storage
+    // Finalize Layout: Gather the hierarchy data, generate a PNG, and save both to local storage
     document.getElementById('finalize-btn').addEventListener('click', () => {
       const layoutData = [];
+      // Traverse each division
       document.querySelectorAll('.division').forEach(divisionElem => {
         const divisionName = divisionElem.querySelector('input[type="text"]').value || "Unnamed Division";
         const divisionData = { name: divisionName, subdivisions: [] };
         
+        // Traverse each subdivision in this division
         divisionElem.querySelectorAll('.subdivision').forEach(subdivisionElem => {
           const subdivisionName = subdivisionElem.querySelector('input[type="text"]').value || "Unnamed Subdivision";
           const subdivisionData = { name: subdivisionName, rows: [] };
           
+          // Traverse each row in this subdivision
           subdivisionElem.querySelectorAll('.seat-row-container').forEach(rowContainer => {
             const rowDiv = rowContainer.querySelector('.seat-row');
             const rowData = [];
@@ -309,8 +345,19 @@
         layoutData.push(divisionData);
       });
       
+      // Save layout data
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
-      alert("Layout finalized and saved!");
+      
+      // Use html2canvas to capture the layout editor as a PNG image
+      html2canvas(document.getElementById('layout-editor')).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
+        // Save the PNG data URL in local storage for later use (for example, on the group page)
+        localStorage.setItem('auditoriumRoomLayoutImage', imgData);
+        alert("Layout finalized and PNG image saved!");
+      }).catch(err => {
+        console.error("Error generating image:", err);
+        alert("Layout saved, but failed to generate PNG image.");
+      });
     });
   </script>
 </body>
