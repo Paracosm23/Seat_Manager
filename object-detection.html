@@ -1,135 +1,130 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Chair and Square Detection with COCO-SSD</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background-color: #121212;
-        color: #e0e0e0;
-        text-align: center;
-        padding: 20px;
-      }
-      #canvas {
-        border: 1px solid #555;
-        margin-top: 20px;
-      }
-      input[type="file"] {
-        margin-top: 20px;
-      }
-      button {
-        margin-top: 10px;
-        padding: 8px 12px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-      #status {
-        margin-top: 10px;
-      }
-    </style>
-    <!-- Load TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <!-- Load COCO-SSD Model -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-  </head>
-  <body>
-    <h1>Chair and Square Detection</h1>
-    <p>Upload an image to detect chairs or square objects.</p>
-    <input type="file" id="image-upload" accept="image/*">
-    <br>
-    <button id="download-btn">Download Predictions</button>
-    <canvas id="canvas"></canvas>
-    <p id="status">Loading model, please wait...</p>
-    
-    <script>
-      let model;
-      const statusEl = document.getElementById("status");
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      let pendingImage = null; // if an image is uploaded before the model loads
+<head>
+  <meta charset="utf-8">
+  <title>Top-Down Chair Detection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      text-align: center;
+      padding: 20px;
+    }
+    #canvas {
+      border: 1px solid #555;
+      margin-top: 20px;
+    }
+    input[type="file"] {
+      margin-top: 20px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 10px;
+    }
+  </style>
+  <!-- Load TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <!-- Load the COCO-SSD model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body>
+  <h1>Top-Down Chair Detection</h1>
+  <p>Upload an image (or a diagram) and detect individual chairs.</p>
+  <input type="file" id="image-upload" accept="image/*">
+  <br>
+  <button id="download-btn">Download Predictions</button>
+  <canvas id="canvas"></canvas>
+  <p id="status">Loading model, please wait...</p>
+  
+  <script>
+    let model;
+    const statusEl = document.getElementById("status");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let pendingImage = null; // if an image is uploaded before model loads
 
-      // Load the COCO-SSD model
-      cocoSsd.load().then(loadedModel => {
-        model = loadedModel;
-        statusEl.textContent = "Model loaded. Please upload an image.";
-        if (pendingImage) {
-          processImage(pendingImage);
-          pendingImage = null;
-        }
-      }).catch(err => {
-        statusEl.textContent = "Error loading model.";
-        console.error(err);
-      });
+    // Load the COCO-SSD model
+    cocoSsd.load().then(loadedModel => {
+      model = loadedModel;
+      statusEl.textContent = "Model loaded. Please upload an image.";
+      if (pendingImage) {
+        processImage(pendingImage);
+        pendingImage = null;
+      }
+    }).catch(err => {
+      statusEl.textContent = "Error loading model.";
+      console.error(err);
+    });
 
-      // Process the image: draw it and run detection
-      function processImage(img) {
-        // Resize canvas to match image dimensions
-        canvas.width = img.width;
-        canvas.height = img.height;
-        // Draw the image on the canvas
-        ctx.drawImage(img, 0, 0);
-        // Run object detection
-        model.detect(img).then(predictions => {
-          // Filter predictions: include "chair" objects or those with nearly square bounding boxes
-          const filtered = predictions.filter(prediction => {
-            const cls = prediction.class.toLowerCase();
-            if (cls === "chair") return true;
-            const [x, y, width, height] = prediction.bbox;
-            return Math.abs(width - height) < 20;
-          });
-          console.log("Filtered Predictions:", filtered);
-          // Draw bounding boxes for filtered predictions
-          filtered.forEach(prediction => {
-            const [x, y, width, height] = prediction.bbox;
-            ctx.strokeStyle = "red";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, width, height);
-            ctx.fillStyle = "red";
-            ctx.font = "16px Arial";
-            const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
-            ctx.fillText(text, x, y > 10 ? y - 5 : 10);
-          });
-          // Store the filtered predictions in localStorage
-          localStorage.setItem("lastDetections", JSON.stringify(filtered));
-          statusEl.textContent = "Detection complete.";
-        }).catch(err => {
-          console.error("Detection error:", err);
-          statusEl.textContent = "Error during detection.";
+    // Process the image: draw it on the canvas and run detection
+    function processImage(img) {
+      // Resize canvas to match image dimensions
+      canvas.width = img.width;
+      canvas.height = img.height;
+      // Draw the image on the canvas
+      ctx.drawImage(img, 0, 0);
+      // Run object detection
+      model.detect(img).then(predictions => {
+        // Filter predictions: only include objects labeled as "chair"
+        const chairPredictions = predictions.filter(prediction => {
+          return prediction.class.toLowerCase() === "chair";
         });
-      }
+        console.log("Detected Chairs:", chairPredictions);
+        chairPredictions.forEach(prediction => {
+          const [x, y, width, height] = prediction.bbox;
+          ctx.strokeStyle = "lime";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, width, height);
+          ctx.fillStyle = "lime";
+          ctx.font = "16px Arial";
+          const text = `Chair (${Math.round(prediction.score * 100)}%)`;
+          ctx.fillText(text, x, y > 10 ? y - 5 : 10);
+        });
+        localStorage.setItem("lastDetections", JSON.stringify(chairPredictions));
+        statusEl.textContent = "Detection complete.";
+      }).catch(err => {
+        console.error("Detection error:", err);
+        statusEl.textContent = "Error during detection.";
+      });
+    }
 
-      // Handle file upload
-      document.getElementById("image-upload").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            if (model) {
-              processImage(img);
-            } else {
-              statusEl.textContent = "Model not loaded yet. Processing when ready...";
-              pendingImage = img;
-            }
-          };
-          img.src = event.target.result;
+    // Handle file upload
+    document.getElementById("image-upload").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          if (model) {
+            processImage(img);
+          } else {
+            statusEl.textContent = "Model not loaded yet. Processing when ready...";
+            pendingImage = img;
+          }
         };
-        reader.readAsDataURL(file);
-      });
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
 
-      // Download predictions from localStorage as a JSON file
-      document.getElementById("download-btn").addEventListener("click", () => {
-        const predictions = localStorage.getItem("lastDetections") || "{}";
-        const blob = new Blob([predictions], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "predictions.json";
-        a.click();
-        URL.revokeObjectURL(url);
-      });
-    </script>
-  </body>
+    // Download predictions from localStorage as a JSON file
+    document.getElementById("download-btn").addEventListener("click", () => {
+      const predictions = localStorage.getItem("lastDetections") || "{}";
+      const blob = new Blob([predictions], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "predictions.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
 </html>
