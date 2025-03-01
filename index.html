@@ -10,379 +10,289 @@
       background-color: #121212;
       color: #e0e0e0;
     }
-    /* Overall editor container */
-    #layout-editor {
-      margin-top: 20px;
+    /* File upload controls */
+    #upload-controls {
+      margin-bottom: 20px;
     }
-    /* Division container styling */
-    .division {
-      border: 2px solid #888;
-      padding: 10px;
-      margin-bottom: 15px;
-      background-color: #1e1e1e;
-    }
-    .division > .header {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    /* Subdivision container styling */
-    .subdivision {
-      border: 1px dashed #0077cc;
-      padding: 10px;
-      margin: 10px;
-      background-color: #1e1e1e;
-    }
-    .subdivision > .header {
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    /* Row configuration inside subdivision */
-    .row-config {
-      margin: 5px 0;
-    }
-    .rows-container {
-      margin-top: 5px;
-    }
-    /* Row container styling */
-    .seat-row-container {
-      margin: 5px 0;
-      border: 1px solid #555;
-      padding: 5px;
-      background-color: #1e1e1e;
-    }
-    .row-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 5px;
-      gap: 5px;
-    }
-    .seat-row {
-      display: flex;
-    }
-    /* Seat styling */
-    .seat {
-      width: 30px;
-      height: 30px;
-      border: 1px solid #999;
-      margin-right: 2px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      cursor: pointer;
-      font-size: 0.8em;
-      background-color: #2e2e2e;
-      color: #e0e0e0;
-    }
-    /* Active seat styling - highlighting removed */
-    .seat.active {
-      /* No background highlight */
-    }
-    /* Button styling */
-    button {
-      margin: 2px 0;
+    input[type="file"] {
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
-      padding: 5px 10px;
-      cursor: pointer;
+      padding: 5px;
     }
-    button:hover {
+    /* Background container */
+    #background-container {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      border: 1px solid #555;
+      margin-bottom: 20px;
+      background-size: cover;
+      background-position: center;
+    }
+    /* Overlay for layout elements */
+    #layout-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* Child elements will enable interaction */
+    }
+    /* Division styling */
+    .division {
+      position: absolute;
+      border: 2px solid #888;
+      background-color: rgba(30, 30, 30, 0.8);
+      pointer-events: auto;
+      box-sizing: border-box;
+    }
+    .division .header {
+      background-color: #333;
+      cursor: move;
+      padding: 2px;
+      font-size: 14px;
+    }
+    .division .controls {
+      font-size: 12px;
+      padding: 2px;
+    }
+    /* Subdivision styling */
+    .subdivision {
+      position: relative;
+      border: 1px dashed #0077cc;
+      background-color: rgba(30, 30, 30, 0.8);
+      margin: 5px;
+      pointer-events: auto;
+      box-sizing: border-box;
+    }
+    .subdivision .header {
       background-color: #444;
+      cursor: move;
+      padding: 2px;
+      font-size: 13px;
+    }
+    .subdivision .controls {
+      font-size: 11px;
+      padding: 2px;
+    }
+    /* Button and input styling */
+    button {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 2px 5px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 2px;
     }
     input[type="text"],
     input[type="number"] {
       background-color: #333;
       border: 1px solid #555;
       color: #e0e0e0;
-      padding: 2px 5px;
+      padding: 2px;
+      font-size: 12px;
+      width: 60px;
+      margin-left: 2px;
     }
   </style>
-  <!-- Include html2canvas from a CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <h1>Auditorium Layout Editor (Dark Mode)</h1>
   <p>
-    Build your room by adding Divisions. In each division, add a Subdivision and specify how many rows it should have.
-    Then, for each row, set the number of chairs and select individual seats (or drag–select them) or select the entire row.
-    When you finalize the layout, a PNG image will be generated from the layout.
+    Upload a top‑down image of your room. Then, add divisions and subdivisions that you can resize, rotate, and reposition over the image.
   </p>
   
-  <!-- Global Controls -->
-  <div id="controls">
-    <button id="add-division-btn">Add Division</button>
+  <!-- Upload Background Image -->
+  <div id="upload-controls">
+    <label for="bg-upload">Upload Background Image:</label>
+    <input type="file" id="bg-upload" accept="image/*">
   </div>
   
-  <!-- Main Editor Container -->
-  <div id="layout-editor"></div>
+  <!-- Background Container with Overlay -->
+  <div id="background-container">
+    <!-- The background image will be set via CSS -->
+    <div id="layout-overlay"></div>
+  </div>
   
-  <!-- Finalize Layout -->
-  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout &amp; Generate PNG</button>
+  <!-- Global Controls -->
+  <button id="add-division-btn">Add Division</button>
+  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout &amp; Proceed to Groups</button>
   
   <script>
-    // Global flag for drag selection
-    let isDragging = false;
-    document.addEventListener('mouseup', () => { isDragging = false; });
-    
-    // Toggle a seat's active state (internally tracked, but no visual highlight)
-    function toggleSeat(seat) {
-      if (seat.dataset.active === "false") {
-        seat.dataset.active = "true";
-        seat.classList.add('active');
-      } else {
-        seat.dataset.active = "false";
-        seat.classList.remove('active');
-      }
-    }
-    
-    // Create a single seat element
-    function createSeat(index) {
-      const seat = document.createElement('div');
-      seat.classList.add('seat');
-      seat.textContent = index + 1;
-      seat.dataset.active = "false";
-      
-      // Begin drag selection on mousedown
-      seat.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        toggleSeat(seat);
-      });
-      // If dragging and mouse hovers over a seat, toggle if not already active
-      seat.addEventListener('mouseover', (e) => {
-        if (isDragging && seat.dataset.active === "false") {
-          toggleSeat(seat);
-        }
-      });
-      // Allow a single click to toggle selection
-      seat.addEventListener('click', (e) => {
-        toggleSeat(seat);
-      });
-      return seat;
-    }
-    
-    // Create a row container with controls for adjusting the number of chairs
-    function createRow(seatCount) {
-      const rowContainer = document.createElement('div');
-      rowContainer.classList.add('seat-row-container');
-      
-      // Row header with an input for seat count and control buttons
-      const header = document.createElement('div');
-      header.classList.add('row-header');
-      
-      const label = document.createElement('span');
-      label.textContent = "Chairs:";
-      header.appendChild(label);
-      
-      const seatCountInput = document.createElement('input');
-      seatCountInput.type = "number";
-      seatCountInput.min = "1";
-      seatCountInput.value = seatCount;
-      seatCountInput.style.width = "50px";
-      header.appendChild(seatCountInput);
-      
-      // Button to update the row (adjust number of chairs)
-      const updateBtn = document.createElement('button');
-      updateBtn.textContent = "Update Row";
-      header.appendChild(updateBtn);
-      
-      // Button to toggle selection for the entire row
-      const selectRowBtn = document.createElement('button');
-      selectRowBtn.textContent = "Select Row";
-      header.appendChild(selectRowBtn);
-      
-      rowContainer.appendChild(header);
-      
-      // Container to hold the seats
-      const rowDiv = document.createElement('div');
-      rowDiv.classList.add('seat-row');
-      rowContainer.appendChild(rowDiv);
-      
-      // Render initial seats for this row
-      function renderSeats(newSeatCount) {
-        const currentCount = rowDiv.children.length;
-        if (newSeatCount > currentCount) {
-          // Add extra seats
-          for (let i = currentCount; i < newSeatCount; i++) {
-            const seat = createSeat(i);
-            rowDiv.appendChild(seat);
-          }
-        } else if (newSeatCount < currentCount) {
-          // Remove seats from the end
-          for (let i = currentCount; i > newSeatCount; i--) {
-            rowDiv.removeChild(rowDiv.lastChild);
-          }
-        }
-      }
-      
-      // Create the initial seats
-      for (let i = 0; i < seatCount; i++) {
-        const seat = createSeat(i);
-        rowDiv.appendChild(seat);
-      }
-      
-      // Update Row button: change the number of seats based on input
-      updateBtn.addEventListener('click', function() {
-        const newCount = parseInt(seatCountInput.value);
-        if (isNaN(newCount) || newCount < 1) {
-          alert("Invalid seat count.");
-          seatCountInput.value = rowDiv.children.length;
-          return;
-        }
-        renderSeats(newCount);
-      });
-      
-      // Select Row button: toggle selection for all seats in the row
-      selectRowBtn.addEventListener('click', function() {
-        const seats = rowDiv.querySelectorAll('.seat');
-        const allSelected = Array.from(seats).every(seat => seat.dataset.active === "true");
-        seats.forEach(seat => {
-          if (allSelected) {
-            seat.dataset.active = "false";
-            seat.classList.remove('active');
-          } else {
-            seat.dataset.active = "true";
-            seat.classList.add('active');
-          }
-        });
-      });
-      
-      return rowContainer;
-    }
-    
-    // Create a subdivision where you can specify the number of rows
-    function createSubdivision() {
-      const subdivision = document.createElement('div');
-      subdivision.classList.add('subdivision');
-      
-      // Subdivision header with name input
-      const header = document.createElement('div');
-      header.classList.add('header');
-      const subDivNameInput = document.createElement('input');
-      subDivNameInput.type = "text";
-      subDivNameInput.placeholder = "Subdivision Name";
-      header.appendChild(subDivNameInput);
-      subdivision.appendChild(header);
-      
-      // Row configuration panel: set number of rows for this subdivision
-      const rowConfigDiv = document.createElement('div');
-      rowConfigDiv.classList.add('row-config');
-      const rowsLabel = document.createElement('span');
-      rowsLabel.textContent = "Number of Rows:";
-      rowConfigDiv.appendChild(rowsLabel);
-      
-      const rowCountInput = document.createElement('input');
-      rowCountInput.type = "number";
-      rowCountInput.min = "1";
-      rowCountInput.value = "1"; // default to 1 row
-      rowCountInput.style.width = "50px";
-      rowConfigDiv.appendChild(rowCountInput);
-      
-      const generateRowsBtn = document.createElement('button');
-      generateRowsBtn.textContent = "Generate Rows";
-      rowConfigDiv.appendChild(generateRowsBtn);
-      
-      subdivision.appendChild(rowConfigDiv);
-      
-      // Container to hold the row elements
-      const rowsContainer = document.createElement('div');
-      rowsContainer.classList.add('rows-container');
-      subdivision.appendChild(rowsContainer);
-      
-      generateRowsBtn.addEventListener('click', function() {
-        const numRows = parseInt(rowCountInput.value);
-        if (isNaN(numRows) || numRows < 1) {
-          alert("Invalid number of rows.");
-          return;
-        }
-        // Clear any existing rows
-        rowsContainer.innerHTML = "";
-        // Create each row with a default of 10 chairs (modifiable later)
-        for (let i = 0; i < numRows; i++) {
-          const defaultSeatCount = 10;
-          const row = createRow(defaultSeatCount);
-          rowsContainer.appendChild(row);
-        }
-      });
-      
-      return subdivision;
-    }
-    
-    // Create a division container that can hold subdivisions
-    function createDivision() {
-      const division = document.createElement('div');
-      division.classList.add('division');
-      
-      // Division header with name input and a button to add a subdivision
-      const header = document.createElement('div');
-      header.classList.add('header');
-      
-      const divNameInput = document.createElement('input');
-      divNameInput.type = "text";
-      divNameInput.placeholder = "Division Name";
-      header.appendChild(divNameInput);
-      
-      const addSubdivBtn = document.createElement('button');
-      addSubdivBtn.textContent = "Add Subdivision";
-      addSubdivBtn.addEventListener('click', () => {
-        const subdivision = createSubdivision();
-        division.appendChild(subdivision);
-      });
-      header.appendChild(addSubdivBtn);
-      
-      division.appendChild(header);
-      return division;
-    }
-    
-    // Global control: Add new Division to the layout editor
-    document.getElementById('add-division-btn').addEventListener('click', () => {
-      const division = createDivision();
-      document.getElementById('layout-editor').appendChild(division);
+    // Handle background image upload
+    document.getElementById('bg-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const dataURL = event.target.result;
+        document.getElementById('background-container').style.backgroundImage = 'url(' + dataURL + ')';
+        localStorage.setItem('auditoriumBackgroundImage', dataURL);
+      };
+      reader.readAsDataURL(file);
     });
     
-    // Finalize Layout: Gather the hierarchy data, generate a PNG, save both to localStorage,
-    // and then redirect to the group page.
+    const overlay = document.getElementById('layout-overlay');
+    
+    // Simple dragging support
+    function makeDraggable(el) {
+      let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+      const header = el.querySelector('.header');
+      header.addEventListener('mousedown', dragStart);
+      
+      function dragStart(e) {
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        initialLeft = parseFloat(el.style.left) || 0;
+        initialTop = parseFloat(el.style.top) || 0;
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+      }
+      
+      function dragMove(e) {
+        e.preventDefault();
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        el.style.left = (initialLeft + dx) + "px";
+        el.style.top = (initialTop + dy) + "px";
+      }
+      
+      function dragEnd(e) {
+        document.removeEventListener('mousemove', dragMove);
+        document.removeEventListener('mouseup', dragEnd);
+      }
+    }
+    
+    let divisionCount = 0;
+    
+    // Create a Division with controls for size and rotation
+    function createDivision() {
+      const div = document.createElement('div');
+      div.classList.add('division');
+      div.style.width = "200px";
+      div.style.height = "150px";
+      div.style.left = (20 + divisionCount * 30) + "px";
+      div.style.top = (20 + divisionCount * 30) + "px";
+      div.style.transform = "rotate(0deg)";
+      
+      // Header with division name
+      const header = document.createElement('div');
+      header.classList.add('header');
+      header.textContent = "Division " + (divisionCount + 1);
+      div.appendChild(header);
+      
+      // Controls for width, height, and rotation plus a button to add a subdivision
+      const controls = document.createElement('div');
+      controls.classList.add('controls');
+      controls.innerHTML = `
+        Width: <input type="number" class="width-input" value="200"> 
+        Height: <input type="number" class="height-input" value="150"> 
+        Rotation: <input type="number" class="rotation-input" value="0"> 
+        <button class="apply-btn">Apply</button>
+        <button class="add-subdiv-btn">Add Subdivision</button>
+      `;
+      div.appendChild(controls);
+      
+      controls.querySelector('.apply-btn').addEventListener('click', () => {
+        const width = controls.querySelector('.width-input').value;
+        const height = controls.querySelector('.height-input').value;
+        const rotation = controls.querySelector('.rotation-input').value;
+        div.style.width = width + "px";
+        div.style.height = height + "px";
+        div.style.transform = `rotate(${rotation}deg)`;
+      });
+      
+      controls.querySelector('.add-subdiv-btn').addEventListener('click', () => {
+        const subdiv = createSubdivision();
+        div.appendChild(subdiv);
+      });
+      
+      makeDraggable(div);
+      divisionCount++;
+      return div;
+    }
+    
+    // Create a Subdivision with its own size/rotation controls
+    function createSubdivision() {
+      const subdiv = document.createElement('div');
+      subdiv.classList.add('subdivision');
+      subdiv.style.width = "150px";
+      subdiv.style.height = "100px";
+      subdiv.style.transform = "rotate(0deg)";
+      
+      const header = document.createElement('div');
+      header.classList.add('header');
+      header.textContent = "Subdivision";
+      subdiv.appendChild(header);
+      
+      const controls = document.createElement('div');
+      controls.classList.add('controls');
+      controls.innerHTML = `
+        Width: <input type="number" class="width-input" value="150"> 
+        Height: <input type="number" class="height-input" value="100"> 
+        Rotation: <input type="number" class="rotation-input" value="0"> 
+        <button class="apply-btn">Apply</button>
+      `;
+      subdiv.appendChild(controls);
+      
+      controls.querySelector('.apply-btn').addEventListener('click', () => {
+        const width = controls.querySelector('.width-input').value;
+        const height = controls.querySelector('.height-input').value;
+        const rotation = controls.querySelector('.rotation-input').value;
+        subdiv.style.width = width + "px";
+        subdiv.style.height = height + "px";
+        subdiv.style.transform = `rotate(${rotation}deg)`;
+      });
+      
+      makeDraggable(subdiv);
+      
+      // (Optional: further controls can be added here for rows/seats.)
+      
+      return subdiv;
+    }
+    
+    // Global button to add a new Division
+    document.getElementById('add-division-btn').addEventListener('click', () => {
+      const division = createDivision();
+      overlay.appendChild(division);
+    });
+    
+    // Finalize Layout: collect layout data and save to localStorage, then redirect
     document.getElementById('finalize-btn').addEventListener('click', () => {
       const layoutData = [];
-      // Traverse each division
-      document.querySelectorAll('.division').forEach(divisionElem => {
-        const divisionName = divisionElem.querySelector('input[type="text"]').value || "Unnamed Division";
-        const divisionData = { name: divisionName, subdivisions: [] };
-        
-        // Traverse each subdivision in this division
-        divisionElem.querySelectorAll('.subdivision').forEach(subdivisionElem => {
-          const subdivisionName = subdivisionElem.querySelector('input[type="text"]').value || "Unnamed Subdivision";
-          const subdivisionData = { name: subdivisionName, rows: [] };
-          
-          // Traverse each row in this subdivision
-          subdivisionElem.querySelectorAll('.seat-row-container').forEach(rowContainer => {
-            const rowDiv = rowContainer.querySelector('.seat-row');
-            const rowData = [];
-            rowDiv.querySelectorAll('.seat').forEach(seatElem => {
-              rowData.push(seatElem.dataset.active === "true");
-            });
-            subdivisionData.rows.push(rowData);
-          });
-          divisionData.subdivisions.push(subdivisionData);
+      overlay.querySelectorAll('.division').forEach(div => {
+        const divRect = div.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        const divisionData = {
+          name: div.querySelector('.header').textContent,
+          x: divRect.left - overlayRect.left,
+          y: divRect.top - overlayRect.top,
+          width: div.offsetWidth,
+          height: div.offsetHeight,
+          rotation: parseFloat(div.style.transform.replace('rotate(', '').replace('deg)', '')) || 0,
+          subdivisions: []
+        };
+        div.querySelectorAll('.subdivision').forEach(subdiv => {
+          const sRect = subdiv.getBoundingClientRect();
+          const subdivData = {
+            name: subdiv.querySelector('.header').textContent,
+            x: sRect.left - divRect.left,
+            y: sRect.top - divRect.top,
+            width: subdiv.offsetWidth,
+            height: subdiv.offsetHeight,
+            rotation: parseFloat(subdiv.style.transform.replace('rotate(', '').replace('deg)', '')) || 0
+          };
+          divisionData.subdivisions.push(subdivData);
         });
         layoutData.push(divisionData);
       });
       
-      // Save layout data to localStorage
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
-      
-      // Use html2canvas to capture the layout editor as a PNG image
-      html2canvas(document.getElementById('layout-editor')).then(canvas => {
-        const imgData = canvas.toDataURL("image/png");
-        // Save the PNG data URL in localStorage for later use (for example, on the group page)
-        localStorage.setItem('auditoriumRoomLayoutImage', imgData);
-        // Inform the user and then redirect to the group page
-        alert("Layout finalized and PNG image saved! Redirecting to Group page...");
-        window.location.href = "groups.html";
-      }).catch(err => {
-        console.error("Error generating image:", err);
-        alert("Layout saved, but failed to generate PNG image.");
-      });
+      alert("Layout finalized and saved! Redirecting to Groups page...");
+      window.location.href = "groups.html";
     });
   </script>
 </body>
