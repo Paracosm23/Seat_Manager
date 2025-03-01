@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor (Dark Mode) - Revised</title>
+  <title>Auditorium Layout Editor (Dark Mode) - Enhanced Row Editing</title>
   <style>
     /* ---------- Global Styles & Dark Mode ---------- */
     body {
@@ -98,33 +98,41 @@
       box-sizing: border-box;
       pointer-events: auto;
     }
-    .final-division .division-header {
+    /* Division nameplate that can be dragged freely */
+    .division-nameplate {
+      position: absolute;
+      top: -30px;
+      left: 0;
       background-color: #333;
       padding: 4px;
       font-size: 14px;
       cursor: move;
     }
-    .final-division .grid-container {
-      position: relative;
-      width: 100%;
-      /* Let the container height adjust to its content */
-      /* height: auto; is default */
-    }
-    /* Each row in its own "row-box" that is draggable */
+    /* ---------- Row Box Styles ---------- */
     .row-box {
       position: absolute;
       border: 1px dashed #555;
-      padding: 2px;
       background-color: #222;
       cursor: move;
     }
-    .row-box .row-header {
-      background-color: #444;
-      padding: 2px;
-      cursor: move;
+    /* The row number label (to the left of seats) */
+    .row-number {
+      position: absolute;
+      left: -50px;
+      top: 0;
+      width: 40px;
+      text-align: right;
+      padding-right: 5px;
       font-size: 12px;
+      line-height: 30px;
     }
-    .row-box .seat {
+    /* Container for seats inside a row */
+    .row-content {
+      margin-left: 50px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .seat {
       display: inline-block;
       width: 30px;
       height: 30px;
@@ -135,6 +143,27 @@
       font-size: 0.8em;
       background-color: #2e2e2e;
       color: #e0e0e0;
+    }
+    /* Resize handle for row boxes */
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #e0e0e0;
+      right: 0;
+      bottom: 0;
+      cursor: se-resize;
+    }
+    /* Rotate handle for row boxes */
+    .rotate-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background-color: #e0e0e0;
+      border-radius: 50%;
+      right: 0;
+      top: 0;
+      cursor: grab;
     }
     /* ---------- Sidebar - Division Config ---------- */
     .division-config {
@@ -230,7 +259,7 @@
       });
     });
     
-    // Toggle sidebar using hamburger icon (which is fixed)
+    // Toggle sidebar using hamburger icon
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('hidden');
     });
@@ -251,7 +280,7 @@
     /*********** Draggable Functionality ***********/
     function makeDraggable(el, handleSelector) {
       let startX = 0, startY = 0, initLeft = 0, initTop = 0;
-      const handle = el.querySelector(handleSelector) || el;
+      const handle = handleSelector ? el.querySelector(handleSelector) : el;
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         startX = e.clientX;
@@ -273,17 +302,58 @@
       }
     }
     
-    // Make row boxes draggable within the division
+    // Make a row box draggable within its division using its row-number as the handle
     function makeDraggableRow(rowEl) {
       rowEl.style.position = "absolute";
-      let header = rowEl.querySelector('.row-header');
-      if (!header) {
-        header = document.createElement('div');
-        header.classList.add('row-header');
-        header.textContent = "Row";
-        rowEl.insertBefore(header, rowEl.firstChild);
-      }
-      makeDraggable(rowEl, '.row-header');
+      // Ensure row-number exists (it is our handle)
+      makeDraggable(rowEl, '.row-number');
+    }
+    
+    /*********** Resizable Functionality ***********/
+    function makeResizable(el, handle) {
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        let startX = e.clientX;
+        let startY = e.clientY;
+        let startWidth = parseFloat(window.getComputedStyle(el).width);
+        let startHeight = parseFloat(window.getComputedStyle(el).height);
+        function doDrag(e) {
+          el.style.width = (startWidth + e.clientX - startX) + 'px';
+          el.style.height = (startHeight + e.clientY - startY) + 'px';
+        }
+        function stopDrag() {
+          document.documentElement.removeEventListener('mousemove', doDrag, false);
+          document.documentElement.removeEventListener('mouseup', stopDrag, false);
+        }
+        document.documentElement.addEventListener('mousemove', doDrag, false);
+        document.documentElement.addEventListener('mouseup', stopDrag, false);
+      }, false);
+    }
+    
+    /*********** Rotatable Functionality ***********/
+    function makeRotatable(el, handle) {
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        let centerX = el.offsetLeft + el.offsetWidth / 2;
+        let centerY = el.offsetTop + el.offsetHeight / 2;
+        let startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+        let startRotation = parseFloat(el.getAttribute('data-rotation')) || 0;
+        function doRotate(e) {
+          let currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+          let angleDiff = currentAngle - startAngle;
+          let newRotation = startRotation + angleDiff * (180 / Math.PI);
+          el.style.transform = 'rotate(' + newRotation + 'deg)';
+          el.setAttribute('data-rotation', newRotation);
+        }
+        function stopRotate() {
+          document.removeEventListener('mousemove', doRotate);
+          document.removeEventListener('mouseup', stopRotate);
+        }
+        document.addEventListener('mousemove', doRotate);
+        document.addEventListener('mouseup', stopRotate);
+      });
     }
     
     /*********** Division Config in Sidebar ***********/
@@ -307,7 +377,7 @@
       rowList.classList.add('row-list');
       box.appendChild(rowList);
       
-      // Button to add a new row config (each row in its own box)
+      // Button to add a new row config
       const addRowBtn = document.createElement('button');
       addRowBtn.textContent = "Add Row";
       addRowBtn.addEventListener('click', () => {
@@ -338,7 +408,7 @@
           finalDiv = createFinalDivision(divName, rows);
           box.generatedDivision = finalDiv;
           document.getElementById('seat-overlay').appendChild(finalDiv);
-          makeDraggable(finalDiv, '.division-header');
+          makeDraggable(finalDiv, '.division-nameplate');
         } else {
           updateFinalDivision(finalDiv, divName, rows);
         }
@@ -388,80 +458,92 @@
     }
     
     /*********** Final Division Box in Main Area ***********/
-    // Each final division box displays the generated seat grid.
-    // Each row is contained in its own absolutely positioned row-box that restarts numbering at 1.
-    // The row boxes can be dragged freely within the division.
+    // Create a row box that includes a left row-number label, row-content (with seats),
+    // a resize handle, and a rotate handle.
+    function createRowBox(rowIndex, numChairs) {
+      const rowBox = document.createElement('div');
+      rowBox.classList.add('row-box');
+      rowBox.style.left = "0px";
+      rowBox.style.top = (rowIndex * 50) + "px";
+      rowBox.style.position = "absolute";
+      
+      // Row number label
+      const rowNumber = document.createElement('div');
+      rowNumber.classList.add('row-number');
+      rowNumber.textContent = "Row " + (rowIndex + 1);
+      rowBox.appendChild(rowNumber);
+      
+      // Row content container for seats
+      const rowContent = document.createElement('div');
+      rowContent.classList.add('row-content');
+      for (let i = 0; i < numChairs; i++) {
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        seat.textContent = (i + 1);
+        rowContent.appendChild(seat);
+      }
+      rowBox.appendChild(rowContent);
+      
+      // Resize handle at bottom-right
+      const resizeHandle = document.createElement('div');
+      resizeHandle.classList.add('resize-handle');
+      rowBox.appendChild(resizeHandle);
+      makeResizable(rowBox, resizeHandle);
+      
+      // Rotate handle at top-right
+      const rotateHandle = document.createElement('div');
+      rotateHandle.classList.add('rotate-handle');
+      rowBox.appendChild(rotateHandle);
+      makeRotatable(rowBox, rotateHandle);
+      
+      // Make the entire row box draggable using its row-number as the handle
+      makeDraggableRow(rowBox);
+      
+      return rowBox;
+    }
+    
+    // Create a final division box from division name and an array of row chair counts.
     function createFinalDivision(divName, rowsArray) {
       const divBox = document.createElement('div');
       divBox.classList.add('final-division');
       divBox.style.left = "50px";
       divBox.style.top = "50px";
       
-      // Division header (for display and dragging)
-      const header = document.createElement('div');
-      header.classList.add('division-header');
-      header.textContent = divName;
-      divBox.appendChild(header);
+      // Create a draggable division nameplate
+      const nameplate = document.createElement('div');
+      nameplate.classList.add('division-nameplate');
+      nameplate.textContent = divName;
+      nameplate.style.left = "0px";
+      nameplate.style.top = "-30px";
+      divBox.appendChild(nameplate);
+      makeDraggable(nameplate, null);
       
-      // Container for row boxes (grid container)
+      // Container for row boxes
       const gridContainer = document.createElement('div');
       gridContainer.classList.add('grid-container');
       gridContainer.style.position = "relative";
-      gridContainer.style.width = "100%";
-      // Do not force a height so it grows with content
       divBox.appendChild(gridContainer);
       
-      // For each row, create a row-box that restarts numbering at 1
+      // For each row, create a row box using createRowBox
       rowsArray.forEach((numChairs, rowIndex) => {
-        const rowBox = document.createElement('div');
-        rowBox.classList.add('row-box');
-        // Set an initial position (you can reposition later)
-        rowBox.style.left = "0px";
-        rowBox.style.top = (rowIndex * 40) + "px";
-        
-        // Create a header for the row box (for dragging)
-        const rowHeader = document.createElement('div');
-        rowHeader.classList.add('row-header');
-        rowHeader.textContent = "Row " + (rowIndex + 1);
-        rowBox.appendChild(rowHeader);
-        
-        // Create seat elements for this row; numbering starts at 1
-        for (let i = 0; i < numChairs; i++) {
-          const seat = document.createElement('div');
-          seat.classList.add('seat');
-          seat.textContent = (i + 1);
-          rowBox.appendChild(seat);
-        }
+        const rowBox = createRowBox(rowIndex, numChairs);
         gridContainer.appendChild(rowBox);
-        // Make the row box freely draggable within the division
-        makeDraggableRow(rowBox);
       });
       
       return divBox;
     }
     
-    // Update an existing final division box with new name and rows configuration
+    // Update an existing final division box with new name and rows configuration.
     function updateFinalDivision(finalDiv, divName, rowsArray) {
-      finalDiv.querySelector('.division-header').textContent = divName;
+      // Update the division nameplate
+      const nameplate = finalDiv.querySelector('.division-nameplate');
+      nameplate.textContent = divName;
+      
       const gridContainer = finalDiv.querySelector('.grid-container');
       gridContainer.innerHTML = "";
       rowsArray.forEach((numChairs, rowIndex) => {
-        const rowBox = document.createElement('div');
-        rowBox.classList.add('row-box');
-        rowBox.style.left = "0px";
-        rowBox.style.top = (rowIndex * 40) + "px";
-        const rowHeader = document.createElement('div');
-        rowHeader.classList.add('row-header');
-        rowHeader.textContent = "Row " + (rowIndex + 1);
-        rowBox.appendChild(rowHeader);
-        for (let i = 0; i < numChairs; i++) {
-          const seat = document.createElement('div');
-          seat.classList.add('seat');
-          seat.textContent = (i + 1);
-          rowBox.appendChild(seat);
-        }
+        const rowBox = createRowBox(rowIndex, numChairs);
         gridContainer.appendChild(rowBox);
-        makeDraggableRow(rowBox);
       });
     }
     
@@ -479,7 +561,7 @@
         const rect = div.getBoundingClientRect();
         const overlayRect = document.getElementById('seat-overlay').getBoundingClientRect();
         divisions.push({
-          name: div.querySelector('.division-header').textContent,
+          name: div.querySelector('.division-nameplate').textContent,
           x: rect.left - overlayRect.left,
           y: rect.top - overlayRect.top,
           width: div.offsetWidth,
