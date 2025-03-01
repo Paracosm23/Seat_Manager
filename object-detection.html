@@ -2,18 +2,20 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Top-Down Chair Detection</title>
+  <title>Square Detection with OpenCV.js</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
       background-color: #121212;
       color: #e0e0e0;
+      font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
     }
-    #canvas {
+    #canvasOutput {
       border: 1px solid #555;
       margin-top: 20px;
+      max-width: 90vw;
+      max-height: 80vh;
     }
     input[type="file"] {
       margin-top: 20px;
@@ -28,102 +30,130 @@
       margin-top: 10px;
     }
   </style>
-  <!-- Load TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <!-- Load the COCO-SSD model -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <!-- Load OpenCV.js from CDN (version may vary) -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
 <body>
-  <h1>Top-Down Chair Detection</h1>
-  <p>Upload an image (or a diagram) and detect individual chairs.</p>
-  <input type="file" id="image-upload" accept="image/*">
+  <h1>White Square Detection (OpenCV.js)</h1>
+  <p>Upload a top-down seating chart to detect white squares.</p>
+  <input type="file" id="fileInput" accept="image/*">
   <br>
-  <button id="download-btn">Download Predictions</button>
-  <canvas id="canvas"></canvas>
-  <p id="status">Loading model, please wait...</p>
-  
-  <script>
-    let model;
-    const statusEl = document.getElementById("status");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    let pendingImage = null; // if an image is uploaded before model loads
+  <button id="detectBtn" disabled>Detect Squares</button>
+  <p id="status">Loading OpenCV.js ...</p>
+  <canvas id="canvasOutput"></canvas>
 
-    // Load the COCO-SSD model
-    cocoSsd.load().then(loadedModel => {
-      model = loadedModel;
-      statusEl.textContent = "Model loaded. Please upload an image.";
-      if (pendingImage) {
-        processImage(pendingImage);
-        pendingImage = null;
-      }
-    }).catch(err => {
-      statusEl.textContent = "Error loading model.";
-      console.error(err);
+  <script>
+    let cvReady = false;
+    let src = null; // The OpenCV image source
+    let canvas = document.getElementById('canvasOutput');
+    let ctx = canvas.getContext('2d');
+    let detectBtn = document.getElementById('detectBtn');
+    let statusEl = document.getElementById('status');
+
+    // Wait for OpenCV.js to fully load
+    document.addEventListener('opencvready', () => {
+      cvReady = true;
+      statusEl.textContent = "OpenCV.js is ready. Please upload an image.";
+      detectBtn.disabled = false;
     });
 
-    // Process the image: draw it on the canvas and run detection
-    function processImage(img) {
-      // Resize canvas to match image dimensions
-      canvas.width = img.width;
-      canvas.height = img.height;
-      // Draw the image on the canvas
-      ctx.drawImage(img, 0, 0);
-      // Run object detection
-      model.detect(img).then(predictions => {
-        // Filter predictions: only include objects labeled as "chair"
-        const chairPredictions = predictions.filter(prediction => {
-          return prediction.class.toLowerCase() === "chair";
-        });
-        console.log("Detected Chairs:", chairPredictions);
-        chairPredictions.forEach(prediction => {
-          const [x, y, width, height] = prediction.bbox;
-          ctx.strokeStyle = "lime";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, width, height);
-          ctx.fillStyle = "lime";
-          ctx.font = "16px Arial";
-          const text = `Chair (${Math.round(prediction.score * 100)}%)`;
-          ctx.fillText(text, x, y > 10 ? y - 5 : 10);
-        });
-        localStorage.setItem("lastDetections", JSON.stringify(chairPredictions));
-        statusEl.textContent = "Detection complete.";
-      }).catch(err => {
-        console.error("Detection error:", err);
-        statusEl.textContent = "Error during detection.";
-      });
-    }
+    // If the above event doesn't fire, we can also check Module
+    // This is a fallback if opencvready isn't triggered:
+    window.onload = function() {
+      if (cv && cv.matFromImageData) {
+        cvReady = true;
+        statusEl.textContent = "OpenCV.js is ready. Please upload an image.";
+        detectBtn.disabled = false;
+      }
+    };
 
     // Handle file upload
-    document.getElementById("image-upload").addEventListener("change", (e) => {
-      const file = e.target.files[0];
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      let file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          if (model) {
-            processImage(img);
-          } else {
-            statusEl.textContent = "Model not loaded yet. Processing when ready...";
-            pendingImage = img;
-          }
+      let reader = new FileReader();
+      reader.onload = function(ev) {
+        let img = new Image();
+        img.onload = function() {
+          // Resize canvas to match image
+          canvas.width = img.width;
+          canvas.height = img.height;
+          // Draw the image
+          ctx.drawImage(img, 0, 0);
+          // Create OpenCV mat from the drawn image
+          if (src) src.delete(); // Clean up old mat if any
+          src = new cv.Mat(canvas.height, canvas.width, cv.CV_8UC4);
+          src.data.set(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+          statusEl.textContent = "Image loaded. Click 'Detect Squares'.";
         };
-        img.src = event.target.result;
+        img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     });
 
-    // Download predictions from localStorage as a JSON file
-    document.getElementById("download-btn").addEventListener("click", () => {
-      const predictions = localStorage.getItem("lastDetections") || "{}";
-      const blob = new Blob([predictions], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "predictions.json";
-      a.click();
-      URL.revokeObjectURL(url);
+    // The main detection pipeline
+    detectBtn.addEventListener('click', function() {
+      if (!cvReady || !src) {
+        statusEl.textContent = "No image or OpenCV not ready.";
+        return;
+      }
+      statusEl.textContent = "Processing...";
+      // Convert RGBA image (src) to grayscale
+      let gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+      // Threshold: assume squares are white on darker background
+      let thresh = new cv.Mat();
+      // You can adjust 200 -> 128 or other threshold as needed
+      cv.threshold(gray, thresh, 200, 255, cv.THRESH_BINARY);
+
+      // Find contours
+      let contours = new cv.MatVector();
+      let hierarchy = new cv.Mat();
+      cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      // We'll draw bounding boxes on top of the original image
+      ctx.drawImage(canvas, 0, 0); // re-draw the base image
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'red';
+
+      // For storing data about detected squares
+      let squaresData = [];
+
+      for (let i = 0; i < contours.size(); i++) {
+        let contour = contours.get(i);
+        // Approximate polygon
+        let approx = new cv.Mat();
+        cv.approxPolyDP(contour, approx, 2, true); // 2 is epsilon, tweak as needed
+
+        // We'll treat it as a "square" if it has 4 vertices, area > some min, and is convex
+        if (approx.rows === 4 && cv.isContourConvex(approx)) {
+          // Get bounding box
+          let rect = cv.boundingRect(approx);
+          let area = rect.width * rect.height;
+          // Filter out very small boxes if needed
+          if (area > 50) {
+            // Draw bounding box
+            ctx.beginPath();
+            ctx.rect(rect.x, rect.y, rect.width, rect.height);
+            ctx.stroke();
+
+            // Store the bounding box in squaresData
+            squaresData.push({x: rect.x, y: rect.y, width: rect.width, height: rect.height});
+          }
+        }
+        approx.delete();
+      }
+
+      // Save squaresData to localStorage
+      localStorage.setItem('detectedSquares', JSON.stringify(squaresData));
+      statusEl.textContent = `Done. Found ${squaresData.length} potential squares.`;
+      
+      // Cleanup
+      gray.delete(); 
+      thresh.delete();
+      contours.delete();
+      hierarchy.delete();
     });
   </script>
 </body>
