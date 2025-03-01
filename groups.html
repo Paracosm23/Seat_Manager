@@ -2,25 +2,27 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Group Assignment - Division Views</title>
+  <title>Group Assignment - Division Views (Dark Mode)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
+      background-color: #121212;
+      color: #e0e0e0;
     }
     /* Container for each division image */
     .division-container {
       position: relative;
       display: inline-block;
-      border: 1px solid #ccc;
+      border: 1px solid #555;
       margin: 10px;
+      background-color: #1e1e1e;
     }
     .division-image {
       display: block;
       max-width: 100%;
-      /* Ensure a top-down (flat) view */
     }
-    /* Marker styling (each marker represents a seat/group selection) */
+    /* Marker styling */
     .marker {
       position: absolute;
       width: 20px;
@@ -37,15 +39,33 @@
     .rotate-btn {
       display: block;
       margin-top: 5px;
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 5px 10px;
+      cursor: pointer;
     }
     /* Group controls styling */
     #group-controls {
       margin-bottom: 20px;
     }
+    button {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    input[type="text"] {
+      background-color: #333;
+      border: 1px solid #555;
+      color: #e0e0e0;
+      padding: 2px 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>Group Assignment - Division Views</h1>
+  <h1>Group Assignment - Division Views (Dark Mode)</h1>
   <p>
     Set the current group name, then click on any division image to add markers for that group.
     Use the "Rotate Division" buttons to change the orientation of each division.
@@ -58,7 +78,7 @@
     <button id="set-group-btn">Set Current Group</button>
   </div>
   
-  <!-- Divisions Container: Each division image will be placed here -->
+  <!-- Divisions Container -->
   <div id="divisions-container"></div>
   
   <!-- Finalize Groups Button -->
@@ -86,7 +106,7 @@
     }
     divisionImages = JSON.parse(divisionImages);
     
-    // Array to store marker data for each click (each marker includes division index, x/y, group, and rotation)
+    // Array to store marker data
     const markers = [];
     
     // Create containers for each division image
@@ -100,15 +120,15 @@
       const imgEl = document.createElement('img');
       imgEl.classList.add('division-image');
       imgEl.src = imgData;
-      imgEl.dataset.rotation = 0; // default rotation angle in degrees
+      imgEl.dataset.rotation = 0; // default rotation
       divContainer.appendChild(imgEl);
       
-      // Create a rotate button for this division
+      // Rotate button for this division
       const rotateBtn = document.createElement('button');
       rotateBtn.classList.add('rotate-btn');
       rotateBtn.textContent = "Rotate Division";
       rotateBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent click propagation to container
+        e.stopPropagation();
         let currentRotation = parseInt(imgEl.dataset.rotation);
         currentRotation = (currentRotation + 90) % 360;
         imgEl.dataset.rotation = currentRotation;
@@ -116,27 +136,21 @@
       });
       divContainer.appendChild(rotateBtn);
       
-      // Add click event to the container to add a marker
+      // Add click event to add a marker
       divContainer.addEventListener('click', (e) => {
-        // Ensure a group name has been set
         if (!currentGroup) {
           alert("Please set a current group first.");
           return;
         }
-        // Calculate click coordinates relative to the division container
         const rect = divContainer.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // Create a marker element
         const marker = document.createElement('div');
         marker.classList.add('marker');
-        // Center the marker (marker is 20px x 20px)
         marker.style.left = (x - 10) + "px";
         marker.style.top = (y - 10) + "px";
-        // Display the first letter of the current group as a label
         marker.textContent = currentGroup.charAt(0).toUpperCase();
-        // Store additional data on the marker element if needed
         marker.dataset.group = currentGroup;
         marker.dataset.division = divisionIndex;
         marker.dataset.x = x;
@@ -144,7 +158,6 @@
         
         divContainer.appendChild(marker);
         
-        // Save marker data
         markers.push({
           division: divisionIndex,
           group: currentGroup,
@@ -157,7 +170,7 @@
       divisionsContainer.appendChild(divContainer);
     });
     
-    // Finalize Groups: Save markers data to localStorage
+    // Finalize Groups: Save markers to localStorage
     document.getElementById('finalize-groups-btn').addEventListener('click', () => {
       localStorage.setItem('auditoriumGroups', JSON.stringify(markers));
       alert("Groups finalized and saved!");
