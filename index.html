@@ -2,11 +2,13 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor</title>
+  <title>Auditorium Layout Editor (Dark Mode)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
+      background-color: #121212;
+      color: #e0e0e0;
     }
     /* Overall editor container */
     #layout-editor {
@@ -14,9 +16,10 @@
     }
     /* Division container styling */
     .division {
-      border: 2px solid #444;
+      border: 2px solid #888;
       padding: 10px;
       margin-bottom: 15px;
+      background-color: #1e1e1e;
     }
     .division > .header {
       font-weight: bold;
@@ -27,6 +30,7 @@
       border: 1px dashed #0077cc;
       padding: 10px;
       margin: 10px;
+      background-color: #1e1e1e;
     }
     .subdivision > .header {
       font-weight: bold;
@@ -42,8 +46,9 @@
     /* Row container styling */
     .seat-row-container {
       margin: 5px 0;
-      border: 1px solid #ccc;
+      border: 1px solid #555;
       padding: 5px;
+      background-color: #1e1e1e;
     }
     .row-header {
       display: flex;
@@ -66,22 +71,38 @@
       user-select: none;
       cursor: pointer;
       font-size: 0.8em;
+      background-color: #2e2e2e;
+      color: #e0e0e0;
     }
     /* Active seat styling - highlighting removed */
     .seat.active {
-      /* Background highlighting has been removed */
-      /* background-color: #ff0; */
+      /* No background highlight */
     }
     /* Button styling */
     button {
       margin: 2px 0;
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #444;
+    }
+    input[type="text"],
+    input[type="number"] {
+      background-color: #333;
+      border: 1px solid #555;
+      color: #e0e0e0;
+      padding: 2px 5px;
     }
   </style>
   <!-- Include html2canvas from a CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-  <h1>Auditorium Layout Editor</h1>
+  <h1>Auditorium Layout Editor (Dark Mode)</h1>
   <p>
     Build your room by adding Divisions. In each division, add a Subdivision and specify how many rows it should have.
     Then, for each row, set the number of chairs and select individual seats (or drag–select them) or select the entire row.
