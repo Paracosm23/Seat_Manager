@@ -2,21 +2,23 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Group Assignment Page</title>
+  <title>Group Assignment - Division Views</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
     }
-    /* Container for the layout image (allows overlaying markers) */
-    #layout-container {
+    /* Container for each division image */
+    .division-container {
       position: relative;
       display: inline-block;
       border: 1px solid #ccc;
+      margin: 10px;
     }
-    #layout-image {
-      max-width: 100%;
+    .division-image {
       display: block;
+      max-width: 100%;
+      /* Ensure a top-down (flat) view */
     }
     /* Marker styling (each marker represents a seat/group selection) */
     .marker {
@@ -24,12 +26,17 @@
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background-color: rgba(255, 0, 0, 0.7);
+      background-color: rgba(0, 0, 255, 0.7);
       color: #fff;
       text-align: center;
       line-height: 20px;
       font-size: 12px;
       pointer-events: none;
+    }
+    /* Rotate button styling */
+    .rotate-btn {
+      display: block;
+      margin-top: 5px;
     }
     /* Group controls styling */
     #group-controls {
@@ -38,41 +45,26 @@
   </style>
 </head>
 <body>
-  <h1>Group Assignment Page</h1>
+  <h1>Group Assignment - Division Views</h1>
   <p>
-    Set your current group name and then click on the layout image to mark seats for that group.
+    Set the current group name, then click on any division image to add markers for that group.
+    Use the "Rotate Division" buttons to change the orientation of each division.
   </p>
   
-  <!-- Group controls: set the current group -->
+  <!-- Group Controls -->
   <div id="group-controls">
     <label for="group-name">Current Group Name:</label>
     <input type="text" id="group-name" placeholder="Enter group name">
     <button id="set-group-btn">Set Current Group</button>
   </div>
   
-  <!-- Layout image container -->
-  <div id="layout-container">
-    <img id="layout-image" src="" alt="Auditorium Layout">
-    <!-- Markers will be added here -->
-  </div>
+  <!-- Divisions Container: Each division image will be placed here -->
+  <div id="divisions-container"></div>
   
-  <!-- Finalize groups button -->
-  <div>
-    <button id="finalize-groups-btn" style="margin-top:20px;">Finalize Groups</button>
-  </div>
+  <!-- Finalize Groups Button -->
+  <button id="finalize-groups-btn" style="margin-top:20px;">Finalize Groups</button>
   
   <script>
-    // Retrieve the saved layout image from localStorage
-    const layoutImageData = localStorage.getItem('auditoriumRoomLayoutImage');
-    if (!layoutImageData) {
-      alert("No layout image found. Please create and finalize a layout first.");
-      window.location.href = "index.html"; // Redirect to the layout page
-    }
-    
-    // Set the image source to the saved PNG data
-    const layoutImage = document.getElementById('layout-image');
-    layoutImage.src = layoutImageData;
-    
     // Variable to hold the current group name
     let currentGroup = "";
     document.getElementById('set-group-btn').addEventListener('click', () => {
@@ -85,47 +77,87 @@
       alert("Current group set to: " + currentGroup);
     });
     
-    // Array to store marker data (each marker represents a group assignment at a position)
+    // Retrieve the division images from localStorage.
+    // Expected to be stored as a JSON array of data URLs under the key "auditoriumDivisionImages".
+    let divisionImages = localStorage.getItem('auditoriumDivisionImages');
+    if (!divisionImages) {
+      alert("No division images found. Please finalize your layout first.");
+      window.location.href = "index.html";
+    }
+    divisionImages = JSON.parse(divisionImages);
+    
+    // Array to store marker data for each click (each marker includes division index, x/y, group, and rotation)
     const markers = [];
     
-    // When the user clicks on the layout container, add a marker if a group is set
-    document.getElementById('layout-container').addEventListener('click', function(e) {
-      // Ensure that a group has been set
-      if (!currentGroup) {
-        alert("Please set a current group before clicking on the image.");
-        return;
-      }
-      // Get the click coordinates relative to the container
-      const containerRect = this.getBoundingClientRect();
-      const x = e.clientX - containerRect.left;
-      const y = e.clientY - containerRect.top;
+    // Create containers for each division image
+    const divisionsContainer = document.getElementById('divisions-container');
+    divisionImages.forEach((imgData, divisionIndex) => {
+      const divContainer = document.createElement('div');
+      divContainer.classList.add('division-container');
+      divContainer.dataset.divisionIndex = divisionIndex;
       
-      // Create a marker element
-      const marker = document.createElement('div');
-      marker.classList.add('marker');
-      // Center the marker (marker is 20px x 20px)
-      marker.style.left = (x - 10) + "px";
-      marker.style.top = (y - 10) + "px";
-      // Display the first letter of the current group as a simple label
-      marker.textContent = currentGroup.charAt(0).toUpperCase();
+      // Create image element for the division view
+      const imgEl = document.createElement('img');
+      imgEl.classList.add('division-image');
+      imgEl.src = imgData;
+      imgEl.dataset.rotation = 0; // default rotation angle in degrees
+      divContainer.appendChild(imgEl);
       
-      // Optionally, store extra data on the marker element
-      marker.dataset.group = currentGroup;
-      marker.dataset.x = x;
-      marker.dataset.y = y;
-      
-      // Append the marker to the layout container
-      this.appendChild(marker);
-      
-      // Save the marker data
-      markers.push({
-        group: currentGroup,
-        x: x,
-        y: y
+      // Create a rotate button for this division
+      const rotateBtn = document.createElement('button');
+      rotateBtn.classList.add('rotate-btn');
+      rotateBtn.textContent = "Rotate Division";
+      rotateBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent click propagation to container
+        let currentRotation = parseInt(imgEl.dataset.rotation);
+        currentRotation = (currentRotation + 90) % 360;
+        imgEl.dataset.rotation = currentRotation;
+        imgEl.style.transform = `rotate(${currentRotation}deg)`;
       });
+      divContainer.appendChild(rotateBtn);
+      
+      // Add click event to the container to add a marker
+      divContainer.addEventListener('click', (e) => {
+        // Ensure a group name has been set
+        if (!currentGroup) {
+          alert("Please set a current group first.");
+          return;
+        }
+        // Calculate click coordinates relative to the division container
+        const rect = divContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Create a marker element
+        const marker = document.createElement('div');
+        marker.classList.add('marker');
+        // Center the marker (marker is 20px x 20px)
+        marker.style.left = (x - 10) + "px";
+        marker.style.top = (y - 10) + "px";
+        // Display the first letter of the current group as a label
+        marker.textContent = currentGroup.charAt(0).toUpperCase();
+        // Store additional data on the marker element if needed
+        marker.dataset.group = currentGroup;
+        marker.dataset.division = divisionIndex;
+        marker.dataset.x = x;
+        marker.dataset.y = y;
+        
+        divContainer.appendChild(marker);
+        
+        // Save marker data
+        markers.push({
+          division: divisionIndex,
+          group: currentGroup,
+          x: x,
+          y: y,
+          rotation: parseInt(imgEl.dataset.rotation)
+        });
+      });
+      
+      divisionsContainer.appendChild(divContainer);
     });
     
-    // When "Finalize Groups" is clicked, save the markers data to localStorage
+    // Finalize Groups: Save markers data to localStorage
     document.getElementById('finalize-groups-btn').addEventListener('click', () => {
       localStorage.setItem('auditoriumGroups', JSON.stringify(markers));
       alert("Groups finalized and saved!");
