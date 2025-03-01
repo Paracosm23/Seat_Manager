@@ -2,132 +2,142 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor (Dark Mode)</title>
+  <title>Auditorium Layout Editor - Division Setup (Dark Mode)</title>
   <style>
-    /* Dark mode base styles */
+    /* Base dark mode styling */
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      margin: 20px;
       background-color: #121212;
       color: #e0e0e0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
-    /* Upload controls */
-    #upload-controls {
-      margin-bottom: 20px;
+    /* Sidebar for division configuration */
+    #sidebar {
+      width: 300px;
+      background-color: #1e1e1e;
+      border-right: 1px solid #555;
+      padding: 10px;
+      box-sizing: border-box;
+      overflow-y: auto;
     }
-    input[type="file"] {
+    #sidebar h2 {
+      margin-top: 0;
+    }
+    /* Each division configuration box */
+    .division-config {
+      border: 1px solid #888;
+      padding: 8px;
+      margin-bottom: 10px;
+      background-color: #2e2e2e;
+    }
+    .division-config .controls {
+      margin-bottom: 5px;
+    }
+    .division-config input[type="number"],
+    .division-config input[type="text"],
+    .division-config input[type="color"] {
+      width: 60px;
+      margin-right: 4px;
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
+      padding: 2px;
+    }
+    .division-config button {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 2px 4px;
+      font-size: 12px;
+      margin-top: 4px;
+      cursor: pointer;
+    }
+    /* Preview area for the seat grid in a division config */
+    .seat-grid {
+      margin-top: 5px;
+      display: inline-block;
+      background-color: #1e1e1e;
       padding: 5px;
     }
-    /* Background container */
-    #background-container {
-      position: relative;
-      width: 800px;
-      height: 600px;
-      border: 1px solid #555;
-      margin-bottom: 20px;
-      background-size: cover;
-      background-position: center;
-    }
-    /* Overlay to hold layout elements (divisions) */
-    #seat-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none; /* Child elements will re-enable interaction */
-    }
-    /* Division styling */
-    .division {
-      position: absolute;
-      box-sizing: border-box;
-      pointer-events: auto;
-      /* Default appearance; these can be changed via controls */
-      border: 2px solid #888888;
-      background-color: #1e1e1e;
-    }
-    /* Division header: used for dragging and shows the division name */
-    .division .header {
-      background-color: #333;
-      cursor: move;
-      padding: 4px;
-      font-size: 14px;
-    }
-    /* Division control panel */
-    .division .controls {
-      padding: 4px;
-      font-size: 12px;
-    }
-    /* Seat grid container inside a division */
-    .seat-grid {
-      margin-top: 4px;
-    }
-    /* Each seat is a 30px square with a small margin */
     .seat {
       display: inline-block;
       width: 30px;
       height: 30px;
-      border: 1px solid #999;
       margin: 2px;
+      border: 1px solid #999;
       text-align: center;
       line-height: 30px;
       font-size: 0.8em;
       background-color: #2e2e2e;
       color: #e0e0e0;
     }
-    /* Global buttons and inputs styling */
-    button {
-      background-color: #333;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 12px;
-      margin-right: 4px;
+    /* Main area for background image */
+    #main-container {
+      flex-grow: 1;
+      padding: 10px;
+      overflow: auto;
     }
-    input[type="number"],
-    input[type="text"],
-    input[type="color"] {
+    #background-container {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      border: 1px solid #555;
+      background-size: cover;
+      background-position: center;
+      margin-bottom: 10px;
+    }
+    /* Upload control styling */
+    #upload-controls {
+      margin-bottom: 10px;
+    }
+    #upload-controls input[type="file"] {
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
-      padding: 2px;
-      font-size: 12px;
-      width: 60px;
-      margin-left: 4px;
+      padding: 5px;
+    }
+    /* Finalize button */
+    #finalize-btn {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <h1>Auditorium Layout Editor (Dark Mode)</h1>
-  <p>
-    Upload a top‑down image of your room. Then add Divisions – each division is a separate box (displaying a seat grid with chair numbers) whose size is determined by the number of rows and chairs you specify. You can change the division’s border style and background color.
-  </p>
-  
-  <!-- Upload Background Image -->
-  <div id="upload-controls">
-    <label for="bg-upload">Upload Background Image:</label>
-    <input type="file" id="bg-upload" accept="image/*">
+  <!-- Sidebar: Division Setup -->
+  <div id="sidebar">
+    <h2>Division Setup</h2>
+    <button id="add-division-btn">Add Division</button>
+    <div id="division-list">
+      <!-- New division configuration boxes will be appended here -->
+    </div>
   </div>
   
-  <!-- Background Container with Overlay -->
-  <div id="background-container">
-    <!-- The background image is set via CSS -->
-    <div id="seat-overlay"></div>
+  <!-- Main Area: Background Image -->
+  <div id="main-container">
+    <h2>Main Area</h2>
+    <div id="upload-controls">
+      <label for="bg-upload">Upload Background Image:</label>
+      <input type="file" id="bg-upload" accept="image/*">
+    </div>
+    <div id="background-container">
+      <!-- The background image will be set as the background of this div -->
+    </div>
+    <button id="finalize-btn">Finalize Layout &amp; Proceed to Groups</button>
   </div>
-  
-  <!-- Global Controls -->
-  <button id="add-division-btn">Add Division</button>
-  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout &amp; Proceed to Groups</button>
   
   <script>
-    // Handle background image upload: set as container background and store in localStorage
+    // Handle background image upload: read file as DataURL and set as background
     document.getElementById('bg-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
-      if (!file) return;
+      if(!file) return;
       const reader = new FileReader();
       reader.onload = function(event) {
         const dataURL = event.target.result;
@@ -137,60 +147,22 @@
       reader.readAsDataURL(file);
     });
     
-    const overlay = document.getElementById('seat-overlay');
-    
-    // Simple draggable functionality
-    function makeDraggable(el) {
-      let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
-      const header = el.querySelector('.header');
-      header.addEventListener('mousedown', dragStart);
+    // Function to create a new division configuration box in the sidebar
+    function createDivisionConfig() {
+      const box = document.createElement('div');
+      box.classList.add('division-config');
       
-      function dragStart(e) {
-        e.preventDefault();
-        startX = e.clientX;
-        startY = e.clientY;
-        initialLeft = parseFloat(el.style.left) || 0;
-        initialTop = parseFloat(el.style.top) || 0;
-        document.addEventListener('mousemove', dragMove);
-        document.addEventListener('mouseup', dragEnd);
-      }
+      // Division name
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = "Division Name:";
+      box.appendChild(nameLabel);
+      const nameInput = document.createElement('input');
+      nameInput.type = "text";
+      nameInput.placeholder = "Division";
+      box.appendChild(nameInput);
+      box.appendChild(document.createElement('br'));
       
-      function dragMove(e) {
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        el.style.left = (initialLeft + dx) + "px";
-        el.style.top = (initialTop + dy) + "px";
-      }
-      
-      function dragEnd(e) {
-        document.removeEventListener('mousemove', dragMove);
-        document.removeEventListener('mouseup', dragEnd);
-      }
-    }
-    
-    let divisionCount = 0;
-    
-    // Create a Division with an embedded seat grid and style controls
-    function createDivision() {
-      const division = document.createElement('div');
-      division.classList.add('division');
-      // Set default position and size
-      division.style.left = (20 + divisionCount * 30) + "px";
-      division.style.top = (20 + divisionCount * 30) + "px";
-      division.style.width = "300px";
-      division.style.height = "200px";
-      division.style.transform = "rotate(0deg)";
-      // Default border and background (can be customized later)
-      division.style.border = "2px solid #888888";
-      division.style.backgroundColor = "#1e1e1e";
-      
-      // Header for dragging and division name
-      const header = document.createElement('div');
-      header.classList.add('header');
-      header.textContent = "Division " + (divisionCount + 1);
-      division.appendChild(header);
-      
-      // Control panel for seat grid generation
+      // Controls for seat grid: number of rows and chairs
       const gridControls = document.createElement('div');
       gridControls.classList.add('controls');
       gridControls.innerHTML = `
@@ -198,9 +170,9 @@
         Chairs: <input type="number" class="chairs-input" value="5" min="1">
         <button class="gen-grid-btn">Generate Grid</button>
       `;
-      division.appendChild(gridControls);
+      box.appendChild(gridControls);
       
-      // Control panel for border and background style
+      // Controls for styling: border and background color
       const styleControls = document.createElement('div');
       styleControls.classList.add('controls');
       styleControls.innerHTML = `
@@ -209,85 +181,73 @@
         Background Color: <input type="color" class="bg-color-input" value="#1e1e1e">
         <button class="apply-style-btn">Apply Style</button>
       `;
-      division.appendChild(styleControls);
+      box.appendChild(styleControls);
       
-      // Container for the seat grid
-      const gridContainer = document.createElement('div');
-      gridContainer.classList.add('seat-grid');
-      // Optional: you can give it a border or margin if desired
-      division.appendChild(gridContainer);
+      // Preview area for the seat grid (this box shows only the chair numbers)
+      const gridPreview = document.createElement('div');
+      gridPreview.classList.add('seat-grid');
+      box.appendChild(gridPreview);
       
-      // Generate Grid button event: create a grid of seats (with chair numbers)
-      gridControls.querySelector('.gen-grid-btn').addEventListener('click', () => {
+      // Generate Grid event: build a seat grid based on input rows/chairs
+      gridControls.querySelector('.gen-grid-btn').addEventListener('click', function() {
         const numRows = parseInt(gridControls.querySelector('.rows-input').value);
         const numChairs = parseInt(gridControls.querySelector('.chairs-input').value);
-        if (isNaN(numRows) || isNaN(numChairs) || numRows < 1 || numChairs < 1) {
+        if(isNaN(numRows) || isNaN(numChairs) || numRows < 1 || numChairs < 1) {
           alert("Please enter valid numbers for rows and chairs.");
           return;
         }
-        // Clear any existing grid
-        gridContainer.innerHTML = "";
-        const seatSize = 30; // each seat is 30px square
-        const margin = 2;    // margin around each seat (in px)
-        // Optionally, adjust the grid container size based on number of seats
-        const gridWidth = numChairs * (seatSize + margin * 2);
-        const gridHeight = numRows * (seatSize + margin * 2);
-        gridContainer.style.width = gridWidth + "px";
-        gridContainer.style.height = gridHeight + "px";
-        // Create the grid rows with numbered seats
-        for (let r = 0; r < numRows; r++) {
+        gridPreview.innerHTML = "";
+        for(let r = 0; r < numRows; r++) {
           const rowDiv = document.createElement('div');
-          rowDiv.style.display = "flex";
-          for (let c = 0; c < numChairs; c++) {
+          for(let c = 0; c < numChairs; c++) {
             const seat = document.createElement('div');
             seat.classList.add('seat');
             seat.textContent = (r * numChairs + c + 1);
             rowDiv.appendChild(seat);
           }
-          gridContainer.appendChild(rowDiv);
+          gridPreview.appendChild(rowDiv);
         }
       });
       
-      // Apply Style button event: update border and background based on inputs
-      styleControls.querySelector('.apply-style-btn').addEventListener('click', () => {
+      // Apply Style event: update grid preview's border and background colors
+      styleControls.querySelector('.apply-style-btn').addEventListener('click', function() {
         const borderColor = styleControls.querySelector('.border-color-input').value;
         const borderWidth = styleControls.querySelector('.border-width-input').value;
         const bgColor = styleControls.querySelector('.bg-color-input').value;
-        division.style.border = borderWidth + "px solid " + borderColor;
-        division.style.backgroundColor = bgColor;
+        gridPreview.style.border = borderWidth + "px solid " + borderColor;
+        gridPreview.style.backgroundColor = bgColor;
       });
       
-      makeDraggable(division);
-      divisionCount++;
-      return division;
+      return box;
     }
     
-    // Global control: add a new Division to the overlay
-    document.getElementById('add-division-btn').addEventListener('click', () => {
-      const division = createDivision();
-      overlay.appendChild(division);
+    // Event: Add Division button in the sidebar creates a new division configuration box
+    document.getElementById('add-division-btn').addEventListener('click', function() {
+      const newDivision = createDivisionConfig();
+      document.getElementById('division-list').appendChild(newDivision);
     });
     
-    // Finalize Layout: Collect layout data and save to localStorage, then redirect
-    document.getElementById('finalize-btn').addEventListener('click', () => {
-      const layoutData = [];
-      // For each division in the overlay
-      overlay.querySelectorAll('.division').forEach(div => {
-        const divRect = div.getBoundingClientRect();
-        const overlayRect = overlay.getBoundingClientRect();
-        const divisionData = {
-          name: div.querySelector('.header').textContent,
-          x: divRect.left - overlayRect.left,
-          y: divRect.top - overlayRect.top,
-          width: div.offsetWidth,
-          height: div.offsetHeight,
-          border: div.style.border,
-          backgroundColor: div.style.backgroundColor,
-          // Optionally, you could extract the seat grid HTML or seat numbers here
-          seatGrid: div.querySelector('.seat-grid') ? div.querySelector('.seat-grid').innerHTML : ""
+    // Finalize Layout: Collect data from all division config boxes and background image,
+    // save to localStorage, and redirect to the groups page.
+    document.getElementById('finalize-btn').addEventListener('click', function() {
+      const divisions = [];
+      document.querySelectorAll('.division-config').forEach(box => {
+        const divisionName = box.querySelector('input[type="text"]').value || "Unnamed Division";
+        const gridHTML = box.querySelector('.seat-grid').innerHTML;
+        const style = {
+          border: box.querySelector('.seat-grid').style.border,
+          backgroundColor: box.querySelector('.seat-grid').style.backgroundColor
         };
-        layoutData.push(divisionData);
+        divisions.push({
+          name: divisionName,
+          gridHTML: gridHTML,
+          style: style
+        });
       });
+      const layoutData = {
+        divisions: divisions,
+        backgroundImage: localStorage.getItem('auditoriumBackgroundImage')
+      };
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
       alert("Layout finalized and saved! Redirecting to Groups page...");
       window.location.href = "groups.html";
