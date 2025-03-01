@@ -2,9 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor - Division Setup (Dark Mode)</title>
+  <title>Auditorium Layout Editor (Dark Mode)</title>
   <style>
-    /* Base dark mode styling */
+    /* Base dark mode styles and layout */
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -14,7 +14,7 @@
       height: 100vh;
       overflow: hidden;
     }
-    /* Sidebar for division configuration */
+    /* Sidebar with tabs */
     #sidebar {
       width: 300px;
       background-color: #1e1e1e;
@@ -22,64 +22,55 @@
       padding: 10px;
       box-sizing: border-box;
       overflow-y: auto;
+      transition: transform 0.3s ease;
     }
-    #sidebar h2 {
-      margin-top: 0;
+    #sidebar.hidden {
+      transform: translateX(-100%);
     }
-    /* Each division configuration box */
-    .division-config {
-      border: 1px solid #888;
-      padding: 8px;
+    /* Tab buttons */
+    .tab-buttons {
+      display: flex;
       margin-bottom: 10px;
-      background-color: #2e2e2e;
     }
-    .division-config .controls {
-      margin-bottom: 5px;
-    }
-    .division-config input[type="number"],
-    .division-config input[type="text"],
-    .division-config input[type="color"] {
-      width: 60px;
-      margin-right: 4px;
+    .tab-button {
+      flex-grow: 1;
+      padding: 6px;
       background-color: #333;
-      color: #e0e0e0;
       border: 1px solid #555;
-      padding: 2px;
-    }
-    .division-config button {
-      background-color: #333;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      padding: 2px 4px;
-      font-size: 12px;
-      margin-top: 4px;
       cursor: pointer;
-    }
-    /* Preview area for the seat grid in a division config */
-    .seat-grid {
-      margin-top: 5px;
-      display: inline-block;
-      background-color: #1e1e1e;
-      padding: 5px;
-    }
-    .seat {
-      display: inline-block;
-      width: 30px;
-      height: 30px;
-      margin: 2px;
-      border: 1px solid #999;
       text-align: center;
-      line-height: 30px;
-      font-size: 0.8em;
-      background-color: #2e2e2e;
-      color: #e0e0e0;
+      font-size: 14px;
     }
-    /* Main area for background image */
+    .tab-button.active {
+      background-color: #444;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    /* Toggle sidebar button */
+    #toggle-sidebar-btn {
+      position: absolute;
+      top: 10px;
+      left: 310px;
+      padding: 4px 8px;
+      background-color: #333;
+      border: 1px solid #555;
+      color: #e0e0e0;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    /* Main area */
     #main-container {
       flex-grow: 1;
+      position: relative;
       padding: 10px;
       overflow: auto;
+      background-color: #181818;
     }
+    /* Background container */
     #background-container {
       position: relative;
       width: 800px;
@@ -87,171 +78,99 @@
       border: 1px solid #555;
       background-size: cover;
       background-position: center;
-      margin-bottom: 10px;
+      margin: 0 auto;
     }
-    /* Upload control styling */
-    #upload-controls {
-      margin-bottom: 10px;
+    /* Overlay for divisions */
+    #seat-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
-    #upload-controls input[type="file"] {
+    /* Division boxes placed over the background */
+    .division {
+      position: absolute;
+      box-sizing: border-box;
+      pointer-events: auto;
+      /* Default style (can be changed later) */
+      border: 2px solid #888888;
+      background-color: #1e1e1e;
+      overflow: hidden;
+    }
+    .division .div-header {
       background-color: #333;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      padding: 5px;
-    }
-    /* Finalize button */
-    #finalize-btn {
-      background-color: #333;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      padding: 6px 12px;
-      cursor: pointer;
+      cursor: move;
+      padding: 4px;
       font-size: 14px;
+    }
+    .division .div-controls {
+      padding: 4px;
+      font-size: 12px;
+      background-color: #2a2a2a;
+    }
+    /* Hidden grid editor panel inside a division */
+    .grid-editor {
+      display: none;
+      padding: 4px;
+      background-color: #222;
+      font-size: 12px;
+      border-top: 1px solid #555;
+    }
+    .grid-editor.active {
+      display: block;
+    }
+    .grid-editor button {
+      margin-top: 4px;
+    }
+    /* Row configuration inside grid editor */
+    .grid-row {
+      margin-bottom: 4px;
+    }
+    .grid-row input[type="number"] {
+      width: 40px;
+      margin-right: 4px;
+    }
+    /* Seat grid preview inside a division */
+    .seat-grid {
+      margin-top: 4px;
+      background-color: #1e1e1e;
+      padding: 4px;
+    }
+    .seat {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 1px solid #999;
+      margin: 2px;
+      text-align: center;
+      line-height: 30px;
+      font-size: 0.8em;
+      background-color: #2e2e2e;
+      color: #e0e0e0;
+    }
+    /* Global buttons and inputs */
+    button, input[type="number"], input[type="text"], input[type="color"] {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 4px;
+      font-size: 12px;
+      margin: 2px 0;
+    }
+    #add-division-btn, #finalize-btn {
+      margin: 10px 5px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Sidebar: Division Setup -->
+  <!-- Sidebar (toggleable) with tabs for Upload and Groups -->
   <div id="sidebar">
-    <h2>Division Setup</h2>
-    <button id="add-division-btn">Add Division</button>
-    <div id="division-list">
-      <!-- New division configuration boxes will be appended here -->
+    <div class="tab-buttons">
+      <div class="tab-button active" data-tab="upload-tab">Upload</div>
+      <div class="tab-button" data-tab="groups-tab">Groups</div>
     </div>
-  </div>
-  
-  <!-- Main Area: Background Image -->
-  <div id="main-container">
-    <h2>Main Area</h2>
-    <div id="upload-controls">
-      <label for="bg-upload">Upload Background Image:</label>
-      <input type="file" id="bg-upload" accept="image/*">
-    </div>
-    <div id="background-container">
-      <!-- The background image will be set as the background of this div -->
-    </div>
-    <button id="finalize-btn">Finalize Layout &amp; Proceed to Groups</button>
-  </div>
-  
-  <script>
-    // Handle background image upload: read file as DataURL and set as background
-    document.getElementById('bg-upload').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const dataURL = event.target.result;
-        document.getElementById('background-container').style.backgroundImage = 'url(' + dataURL + ')';
-        localStorage.setItem('auditoriumBackgroundImage', dataURL);
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    // Function to create a new division configuration box in the sidebar
-    function createDivisionConfig() {
-      const box = document.createElement('div');
-      box.classList.add('division-config');
-      
-      // Division name
-      const nameLabel = document.createElement('label');
-      nameLabel.textContent = "Division Name:";
-      box.appendChild(nameLabel);
-      const nameInput = document.createElement('input');
-      nameInput.type = "text";
-      nameInput.placeholder = "Division";
-      box.appendChild(nameInput);
-      box.appendChild(document.createElement('br'));
-      
-      // Controls for seat grid: number of rows and chairs
-      const gridControls = document.createElement('div');
-      gridControls.classList.add('controls');
-      gridControls.innerHTML = `
-        Rows: <input type="number" class="rows-input" value="3" min="1">
-        Chairs: <input type="number" class="chairs-input" value="5" min="1">
-        <button class="gen-grid-btn">Generate Grid</button>
-      `;
-      box.appendChild(gridControls);
-      
-      // Controls for styling: border and background color
-      const styleControls = document.createElement('div');
-      styleControls.classList.add('controls');
-      styleControls.innerHTML = `
-        Border Color: <input type="color" class="border-color-input" value="#888888">
-        Border Width: <input type="number" class="border-width-input" value="2" min="0">
-        Background Color: <input type="color" class="bg-color-input" value="#1e1e1e">
-        <button class="apply-style-btn">Apply Style</button>
-      `;
-      box.appendChild(styleControls);
-      
-      // Preview area for the seat grid (this box shows only the chair numbers)
-      const gridPreview = document.createElement('div');
-      gridPreview.classList.add('seat-grid');
-      box.appendChild(gridPreview);
-      
-      // Generate Grid event: build a seat grid based on input rows/chairs
-      gridControls.querySelector('.gen-grid-btn').addEventListener('click', function() {
-        const numRows = parseInt(gridControls.querySelector('.rows-input').value);
-        const numChairs = parseInt(gridControls.querySelector('.chairs-input').value);
-        if(isNaN(numRows) || isNaN(numChairs) || numRows < 1 || numChairs < 1) {
-          alert("Please enter valid numbers for rows and chairs.");
-          return;
-        }
-        gridPreview.innerHTML = "";
-        for(let r = 0; r < numRows; r++) {
-          const rowDiv = document.createElement('div');
-          for(let c = 0; c < numChairs; c++) {
-            const seat = document.createElement('div');
-            seat.classList.add('seat');
-            seat.textContent = (r * numChairs + c + 1);
-            rowDiv.appendChild(seat);
-          }
-          gridPreview.appendChild(rowDiv);
-        }
-      });
-      
-      // Apply Style event: update grid preview's border and background colors
-      styleControls.querySelector('.apply-style-btn').addEventListener('click', function() {
-        const borderColor = styleControls.querySelector('.border-color-input').value;
-        const borderWidth = styleControls.querySelector('.border-width-input').value;
-        const bgColor = styleControls.querySelector('.bg-color-input').value;
-        gridPreview.style.border = borderWidth + "px solid " + borderColor;
-        gridPreview.style.backgroundColor = bgColor;
-      });
-      
-      return box;
-    }
-    
-    // Event: Add Division button in the sidebar creates a new division configuration box
-    document.getElementById('add-division-btn').addEventListener('click', function() {
-      const newDivision = createDivisionConfig();
-      document.getElementById('division-list').appendChild(newDivision);
-    });
-    
-    // Finalize Layout: Collect data from all division config boxes and background image,
-    // save to localStorage, and redirect to the groups page.
-    document.getElementById('finalize-btn').addEventListener('click', function() {
-      const divisions = [];
-      document.querySelectorAll('.division-config').forEach(box => {
-        const divisionName = box.querySelector('input[type="text"]').value || "Unnamed Division";
-        const gridHTML = box.querySelector('.seat-grid').innerHTML;
-        const style = {
-          border: box.querySelector('.seat-grid').style.border,
-          backgroundColor: box.querySelector('.seat-grid').style.backgroundColor
-        };
-        divisions.push({
-          name: divisionName,
-          gridHTML: gridHTML,
-          style: style
-        });
-      });
-      const layoutData = {
-        divisions: divisions,
-        backgroundImage: localStorage.getItem('auditoriumBackgroundImage')
-      };
-      localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
-      alert("Layout finalized and saved! Redirecting to Groups page...");
-      window.location.href = "groups.html";
-    });
-  </script>
-</body>
-</html>
+    <div id="upload-tab" class="tab-content active">
+      <h3>U
