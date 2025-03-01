@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <title>Auditorium Layout Editor (Dark Mode)</title>
   <style>
+    /* Dark mode styling */
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
       background-color: #121212;
       color: #e0e0e0;
     }
-    /* File upload controls */
+    /* Upload controls */
     #upload-controls {
       margin-bottom: 20px;
     }
@@ -30,78 +31,90 @@
       background-size: cover;
       background-position: center;
     }
-    /* Overlay for layout elements */
-    #layout-overlay {
+    /* Seat overlay: used to position divisions and subdivisions */
+    #seat-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none; /* Child elements will enable interaction */
+      pointer-events: none; /* Child elements will allow interaction */
     }
     /* Division styling */
     .division {
       position: absolute;
       border: 2px solid #888;
-      background-color: rgba(30, 30, 30, 0.8);
-      pointer-events: auto;
+      background-color: rgba(30,30,30,0.8);
       box-sizing: border-box;
+      pointer-events: auto;
     }
     .division .header {
       background-color: #333;
       cursor: move;
-      padding: 2px;
+      padding: 4px;
       font-size: 14px;
     }
     .division .controls {
+      padding: 4px;
       font-size: 12px;
-      padding: 2px;
     }
-    /* Subdivision styling */
+    /* Subdivision styling (auto-sized by seat grid) */
     .subdivision {
-      position: relative;
+      position: absolute;
       border: 1px dashed #0077cc;
-      background-color: rgba(30, 30, 30, 0.8);
-      margin: 5px;
-      pointer-events: auto;
+      background-color: rgba(30,30,30,0.8);
       box-sizing: border-box;
+      pointer-events: auto;
     }
     .subdivision .header {
       background-color: #444;
       cursor: move;
-      padding: 2px;
+      padding: 3px;
       font-size: 13px;
     }
     .subdivision .controls {
-      font-size: 11px;
-      padding: 2px;
+      padding: 3px;
+      font-size: 12px;
     }
-    /* Button and input styling */
+    /* Seat styling: each seat is a 30px square with a margin */
+    .seat {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 1px solid #999;
+      margin: 2px;
+      text-align: center;
+      line-height: 30px;
+      font-size: 0.8em;
+      background-color: #2e2e2e;
+      color: #e0e0e0;
+    }
+    /* Global buttons and inputs */
     button {
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
-      padding: 2px 5px;
+      padding: 4px 8px;
       cursor: pointer;
       font-size: 12px;
-      margin-left: 2px;
+      margin-right: 4px;
     }
-    input[type="text"],
-    input[type="number"] {
+    input[type="number"], input[type="text"] {
       background-color: #333;
-      border: 1px solid #555;
       color: #e0e0e0;
+      border: 1px solid #555;
       padding: 2px;
       font-size: 12px;
-      width: 60px;
-      margin-left: 2px;
+      width: 50px;
+      margin-left: 4px;
     }
   </style>
 </head>
 <body>
   <h1>Auditorium Layout Editor (Dark Mode)</h1>
   <p>
-    Upload a top‑down image of your room. Then, add divisions and subdivisions that you can resize, rotate, and reposition over the image.
+    Upload a top‑down image of your room. Then add divisions and subdivisions that will automatically size based on the number of rows and chairs you specify.
+    These layout elements are overlaid on your background image.
   </p>
   
   <!-- Upload Background Image -->
@@ -110,10 +123,10 @@
     <input type="file" id="bg-upload" accept="image/*">
   </div>
   
-  <!-- Background Container with Overlay -->
+  <!-- Background Container with Seat Overlay -->
   <div id="background-container">
-    <!-- The background image will be set via CSS -->
-    <div id="layout-overlay"></div>
+    <!-- The background image is set via CSS -->
+    <div id="seat-overlay"></div>
   </div>
   
   <!-- Global Controls -->
@@ -121,7 +134,7 @@
   <button id="finalize-btn" style="margin-top:20px;">Finalize Layout &amp; Proceed to Groups</button>
   
   <script>
-    // Handle background image upload
+    // Handle background image upload and save as a data URL
     document.getElementById('bg-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -134,32 +147,28 @@
       reader.readAsDataURL(file);
     });
     
-    const overlay = document.getElementById('layout-overlay');
+    const overlay = document.getElementById('seat-overlay');
     
-    // Simple dragging support
+    // Simple draggable functionality
     function makeDraggable(el) {
-      let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+      let startX = 0, startY = 0, initialX = 0, initialY = 0;
       const header = el.querySelector('.header');
       header.addEventListener('mousedown', dragStart);
-      
       function dragStart(e) {
         e.preventDefault();
         startX = e.clientX;
         startY = e.clientY;
-        initialLeft = parseFloat(el.style.left) || 0;
-        initialTop = parseFloat(el.style.top) || 0;
+        initialX = parseFloat(el.style.left) || 0;
+        initialY = parseFloat(el.style.top) || 0;
         document.addEventListener('mousemove', dragMove);
         document.addEventListener('mouseup', dragEnd);
       }
-      
       function dragMove(e) {
-        e.preventDefault();
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-        el.style.left = (initialLeft + dx) + "px";
-        el.style.top = (initialTop + dy) + "px";
+        el.style.left = (initialX + dx) + "px";
+        el.style.top = (initialY + dy) + "px";
       }
-      
       function dragEnd(e) {
         document.removeEventListener('mousemove', dragMove);
         document.removeEventListener('mouseup', dragEnd);
@@ -168,99 +177,105 @@
     
     let divisionCount = 0;
     
-    // Create a Division with controls for size and rotation
+    // Create a Division (container for subdivisions)
     function createDivision() {
       const div = document.createElement('div');
       div.classList.add('division');
-      div.style.width = "200px";
-      div.style.height = "150px";
+      // Set a default position
       div.style.left = (20 + divisionCount * 30) + "px";
       div.style.top = (20 + divisionCount * 30) + "px";
       div.style.transform = "rotate(0deg)";
-      
-      // Header with division name
+      // Division header (name)
       const header = document.createElement('div');
       header.classList.add('header');
       header.textContent = "Division " + (divisionCount + 1);
       div.appendChild(header);
-      
-      // Controls for width, height, and rotation plus a button to add a subdivision
+      // Control area for adding subdivisions (optional rotation controls can be added here)
       const controls = document.createElement('div');
       controls.classList.add('controls');
-      controls.innerHTML = `
-        Width: <input type="number" class="width-input" value="200"> 
-        Height: <input type="number" class="height-input" value="150"> 
-        Rotation: <input type="number" class="rotation-input" value="0"> 
-        <button class="apply-btn">Apply</button>
-        <button class="add-subdiv-btn">Add Subdivision</button>
-      `;
-      div.appendChild(controls);
-      
-      controls.querySelector('.apply-btn').addEventListener('click', () => {
-        const width = controls.querySelector('.width-input').value;
-        const height = controls.querySelector('.height-input').value;
-        const rotation = controls.querySelector('.rotation-input').value;
-        div.style.width = width + "px";
-        div.style.height = height + "px";
-        div.style.transform = `rotate(${rotation}deg)`;
-      });
-      
-      controls.querySelector('.add-subdiv-btn').addEventListener('click', () => {
+      const addSubBtn = document.createElement('button');
+      addSubBtn.textContent = "Add Subdivision";
+      addSubBtn.addEventListener('click', () => {
         const subdiv = createSubdivision();
+        // Position the subdivision relative to its division (default inside)
+        subdiv.style.left = "10px";
+        subdiv.style.top = "40px";
         div.appendChild(subdiv);
       });
-      
+      controls.appendChild(addSubBtn);
+      div.appendChild(controls);
       makeDraggable(div);
       divisionCount++;
       return div;
     }
     
-    // Create a Subdivision with its own size/rotation controls
+    // Create a Subdivision that auto-sizes based on rows and chairs
     function createSubdivision() {
       const subdiv = document.createElement('div');
       subdiv.classList.add('subdivision');
-      subdiv.style.width = "150px";
-      subdiv.style.height = "100px";
       subdiv.style.transform = "rotate(0deg)";
-      
+      // Subdivision header
       const header = document.createElement('div');
       header.classList.add('header');
       header.textContent = "Subdivision";
       subdiv.appendChild(header);
-      
+      // Controls: input for number of rows and chairs, and a "Generate Seats" button
       const controls = document.createElement('div');
       controls.classList.add('controls');
       controls.innerHTML = `
-        Width: <input type="number" class="width-input" value="150"> 
-        Height: <input type="number" class="height-input" value="100"> 
-        Rotation: <input type="number" class="rotation-input" value="0"> 
-        <button class="apply-btn">Apply</button>
+        Rows: <input type="number" class="rows-input" value="3" min="1">
+        Chairs: <input type="number" class="chairs-input" value="5" min="1">
+        <button class="gen-seats-btn">Generate Seats</button>
       `;
       subdiv.appendChild(controls);
+      // Container to hold the seat grid
+      const seatsContainer = document.createElement('div');
+      seatsContainer.classList.add('seats-container');
+      subdiv.appendChild(seatsContainer);
       
-      controls.querySelector('.apply-btn').addEventListener('click', () => {
-        const width = controls.querySelector('.width-input').value;
-        const height = controls.querySelector('.height-input').value;
-        const rotation = controls.querySelector('.rotation-input').value;
+      // When "Generate Seats" is clicked, create the seat grid and auto-size the subdivision
+      controls.querySelector('.gen-seats-btn').addEventListener('click', () => {
+        const numRows = parseInt(controls.querySelector('.rows-input').value);
+        const numChairs = parseInt(controls.querySelector('.chairs-input').value);
+        if(isNaN(numRows) || isNaN(numChairs) || numRows < 1 || numChairs < 1) {
+          alert("Please enter valid numbers for rows and chairs.");
+          return;
+        }
+        // Clear any existing seat grid
+        seatsContainer.innerHTML = "";
+        const seatSize = 30; // seat width/height in px
+        const margin = 2;    // margin around each seat (both sides)
+        // Compute subdivision width and height
+        const width = numChairs * (seatSize + margin * 2);
+        const height = numRows * (seatSize + margin * 2);
         subdiv.style.width = width + "px";
         subdiv.style.height = height + "px";
-        subdiv.style.transform = `rotate(${rotation}deg)`;
+        // Create the grid of seats
+        for (let r = 0; r < numRows; r++) {
+          const rowDiv = document.createElement('div');
+          rowDiv.style.display = "flex";
+          for (let c = 0; c < numChairs; c++) {
+            const seat = document.createElement('div');
+            seat.classList.add('seat');
+            // Label the seat with a sequential number (optional)
+            seat.textContent = (r * numChairs + c + 1);
+            rowDiv.appendChild(seat);
+          }
+          seatsContainer.appendChild(rowDiv);
+        }
       });
       
       makeDraggable(subdiv);
-      
-      // (Optional: further controls can be added here for rows/seats.)
-      
       return subdiv;
     }
     
-    // Global button to add a new Division
+    // Global control: Add new Division to the seat overlay
     document.getElementById('add-division-btn').addEventListener('click', () => {
       const division = createDivision();
       overlay.appendChild(division);
     });
     
-    // Finalize Layout: collect layout data and save to localStorage, then redirect
+    // Finalize Layout: Traverse all divisions and subdivisions, collect layout data, save to localStorage, and redirect
     document.getElementById('finalize-btn').addEventListener('click', () => {
       const layoutData = [];
       overlay.querySelectorAll('.division').forEach(div => {
@@ -272,7 +287,7 @@
           y: divRect.top - overlayRect.top,
           width: div.offsetWidth,
           height: div.offsetHeight,
-          rotation: parseFloat(div.style.transform.replace('rotate(', '').replace('deg)', '')) || 0,
+          rotation: parseFloat(div.style.transform.replace("rotate(", "").replace("deg)", "")) || 0,
           subdivisions: []
         };
         div.querySelectorAll('.subdivision').forEach(subdiv => {
@@ -283,13 +298,13 @@
             y: sRect.top - divRect.top,
             width: subdiv.offsetWidth,
             height: subdiv.offsetHeight,
-            rotation: parseFloat(subdiv.style.transform.replace('rotate(', '').replace('deg)', '')) || 0
+            rotation: parseFloat(subdiv.style.transform.replace("rotate(", "").replace("deg)", "")) || 0,
+            // Optionally, you could also save the rows/chairs configuration here.
           };
           divisionData.subdivisions.push(subdivData);
         });
         layoutData.push(divisionData);
       });
-      
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
       alert("Layout finalized and saved! Redirecting to Groups page...");
       window.location.href = "groups.html";
