@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Auditorium Seat Chart</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #seat-chart {
+      display: grid;
+      grid-gap: 5px;
+      margin: 20px 0;
+    }
+    .seat {
+      width: 30px;
+      height: 30px;
+      border: 1px solid #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+    .division-A { background-color: #f99; }
+    .division-B { background-color: #9f9; }
+    .division-C { background-color: #99f; }
+    .division-D { background-color: #ff9; }
+    .selected { border: 2px solid #333; }
+  </style>
+</head>
+<body>
+  <h1>Auditorium Seat Chart</h1>
+  <p>Click a seat to select it. Divisions are color coded.</p>
+  <div id="seat-chart"></div>
+
+  <script>
+    // Auditorium configuration
+    const rows = 10;
+    const cols = 20;
+    
+    // Division configuration: split the auditorium into 4 divisions
+    // Division A: Rows 1-5, Columns 1-10
+    // Division B: Rows 1-5, Columns 11-20
+    // Division C: Rows 6-10, Columns 1-10
+    // Division D: Rows 6-10, Columns 11-20
+    function getDivision(row, col) {
+      if (row <= 5 && col <= 10) return 'division-A';
+      if (row <= 5 && col > 10) return 'division-B';
+      if (row > 5 && col <= 10) return 'division-C';
+      if (row > 5 && col > 10) return 'division-D';
+      return '';
+    }
+    
+    const seatChart = document.getElementById('seat-chart');
+    seatChart.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    
+    // Create seats dynamically
+    for (let r = 1; r <= rows; r++) {
+      for (let c = 1; c <= cols; c++) {
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        const divisionClass = getDivision(r, c);
+        if (divisionClass) seat.classList.add(divisionClass);
+        seat.dataset.row = r;
+        seat.dataset.col = c;
+        seat.title = `Row ${r}, Column ${c}`;
+        seat.textContent = r + '-' + c; // Optional: show seat label
+
+        // Toggle selection on click
+        seat.addEventListener('click', function() {
+          seat.classList.toggle('selected');
+          // Additional group handling can be added here
+          console.log(`Seat ${r}-${c} clicked.`);
+        });
+        
+        seatChart.appendChild(seat);
+      }
+    }
+  </script>
+</body>
+</html>
