@@ -2,111 +2,133 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Create Groups Using Layout</title>
+  <title>Group Assignment Page</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
     }
-    #seat-chart {
-      display: grid;
-      grid-gap: 5px;
-      margin: 20px 0;
+    /* Container for the layout image (allows overlaying markers) */
+    #layout-container {
+      position: relative;
+      display: inline-block;
+      border: 1px solid #ccc;
     }
-    .seat {
-      width: 30px;
-      height: 30px;
-      border: 1px solid #999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.8em;
+    #layout-image {
+      max-width: 100%;
+      display: block;
     }
-    .selected {
-      background-color: #cff;
+    /* Marker styling (each marker represents a seat/group selection) */
+    .marker {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: rgba(255, 0, 0, 0.7);
+      color: #fff;
+      text-align: center;
+      line-height: 20px;
+      font-size: 12px;
+      pointer-events: none;
     }
-    .grouped {
-      border: 2px solid #333;
+    /* Group controls styling */
+    #group-controls {
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Create Groups</h1>
-  <p>Click on active seats to select them, then enter a group name and click the button to assign them.</p>
-  <div>
+  <h1>Group Assignment Page</h1>
+  <p>
+    Set your current group name and then click on the layout image to mark seats for that group.
+  </p>
+  
+  <!-- Group controls: set the current group -->
+  <div id="group-controls">
+    <label for="group-name">Current Group Name:</label>
     <input type="text" id="group-name" placeholder="Enter group name">
-    <button id="assign-btn">Assign Selected Seats to Group</button>
+    <button id="set-group-btn">Set Current Group</button>
   </div>
-  <div id="seat-chart"></div>
+  
+  <!-- Layout image container -->
+  <div id="layout-container">
+    <img id="layout-image" src="" alt="Auditorium Layout">
+    <!-- Markers will be added here -->
+  </div>
+  
+  <!-- Finalize groups button -->
+  <div>
+    <button id="finalize-groups-btn" style="margin-top:20px;">Finalize Groups</button>
+  </div>
+  
   <script>
-    // Retrieve saved layout from local storage
-    const savedData = localStorage.getItem('auditoriumLayout');
-    if (!savedData) {
-      alert("No layout found. Please set up the layout first.");
-      window.location.href = 'layout.html';
-    }
-    const data = JSON.parse(savedData);
-    const rows = data.rows;
-    const cols = data.cols;
-    const layout = data.layout;
-    
-    const seatChart = document.getElementById('seat-chart');
-    seatChart.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
-    
-    // For keeping track of groups (this can be expanded or persisted)
-    const groups = {};
-
-    // Create seat elements based on the saved layout
-    let seatElements = [];
-    for (let r = 0; r < rows; r++) {
-      seatElements[r] = [];
-      for (let c = 0; c < cols; c++) {
-        const seat = document.createElement('div');
-        seat.classList.add('seat');
-        seat.dataset.row = r;
-        seat.dataset.col = c;
-        if (layout[r][c]) {
-          seat.textContent = r + '-' + c;
-          // Click to select/deselect seat for group assignment
-          seat.addEventListener('click', function() {
-            seat.classList.toggle('selected');
-          });
-        } else {
-          // Mark inactive seats (not part of the layout)
-          seat.style.backgroundColor = '#eee';
-        }
-        seatChart.appendChild(seat);
-        seatElements[r][c] = seat;
-      }
+    // Retrieve the saved layout image from localStorage
+    const layoutImageData = localStorage.getItem('auditoriumRoomLayoutImage');
+    if (!layoutImageData) {
+      alert("No layout image found. Please create and finalize a layout first.");
+      window.location.href = "index.html"; // Redirect to the layout page
     }
     
-    document.getElementById('assign-btn').addEventListener('click', function() {
+    // Set the image source to the saved PNG data
+    const layoutImage = document.getElementById('layout-image');
+    layoutImage.src = layoutImageData;
+    
+    // Variable to hold the current group name
+    let currentGroup = "";
+    document.getElementById('set-group-btn').addEventListener('click', () => {
       const groupName = document.getElementById('group-name').value.trim();
       if (!groupName) {
         alert("Please enter a group name.");
         return;
       }
-      // Find all seats that have been selected for grouping
-      const selectedSeats = document.querySelectorAll('.seat.selected');
-      if (selectedSeats.length === 0) {
-        alert("Please select at least one seat.");
+      currentGroup = groupName;
+      alert("Current group set to: " + currentGroup);
+    });
+    
+    // Array to store marker data (each marker represents a group assignment at a position)
+    const markers = [];
+    
+    // When the user clicks on the layout container, add a marker if a group is set
+    document.getElementById('layout-container').addEventListener('click', function(e) {
+      // Ensure that a group has been set
+      if (!currentGroup) {
+        alert("Please set a current group before clicking on the image.");
         return;
       }
-      groups[groupName] = groups[groupName] || [];
-      selectedSeats.forEach(seat => {
-        // Remove the temporary selected style and mark as grouped
-        seat.classList.remove('selected');
-        seat.classList.add('grouped');
-        const row = seat.dataset.row;
-        const col = seat.dataset.col;
-        groups[groupName].push({row, col});
-        // Display the group name on the seat (you can customize this as needed)
-        seat.textContent = groupName;
+      // Get the click coordinates relative to the container
+      const containerRect = this.getBoundingClientRect();
+      const x = e.clientX - containerRect.left;
+      const y = e.clientY - containerRect.top;
+      
+      // Create a marker element
+      const marker = document.createElement('div');
+      marker.classList.add('marker');
+      // Center the marker (marker is 20px x 20px)
+      marker.style.left = (x - 10) + "px";
+      marker.style.top = (y - 10) + "px";
+      // Display the first letter of the current group as a simple label
+      marker.textContent = currentGroup.charAt(0).toUpperCase();
+      
+      // Optionally, store extra data on the marker element
+      marker.dataset.group = currentGroup;
+      marker.dataset.x = x;
+      marker.dataset.y = y;
+      
+      // Append the marker to the layout container
+      this.appendChild(marker);
+      
+      // Save the marker data
+      markers.push({
+        group: currentGroup,
+        x: x,
+        y: y
       });
-      console.log("Groups:", groups);
-      // Clear the group name input for the next assignment
-      document.getElementById('group-name').value = "";
+    });
+    
+    // When "Finalize Groups" is clicked, save the markers data to localStorage
+    document.getElementById('finalize-groups-btn').addEventListener('click', () => {
+      localStorage.setItem('auditoriumGroups', JSON.stringify(markers));
+      alert("Groups finalized and saved!");
     });
   </script>
 </body>
