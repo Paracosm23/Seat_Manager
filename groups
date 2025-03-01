@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Create Groups Using Layout</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #seat-chart {
+      display: grid;
+      grid-gap: 5px;
+      margin: 20px 0;
+    }
+    .seat {
+      width: 30px;
+      height: 30px;
+      border: 1px solid #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+    .selected {
+      background-color: #cff;
+    }
+    .grouped {
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Create Groups</h1>
+  <p>Click on active seats to select them, then enter a group name and click the button to assign them.</p>
+  <div>
+    <input type="text" id="group-name" placeholder="Enter group name">
+    <button id="assign-btn">Assign Selected Seats to Group</button>
+  </div>
+  <div id="seat-chart"></div>
+  <script>
+    // Retrieve saved layout from local storage
+    const savedData = localStorage.getItem('auditoriumLayout');
+    if (!savedData) {
+      alert("No layout found. Please set up the layout first.");
+      window.location.href = 'layout.html';
+    }
+    const data = JSON.parse(savedData);
+    const rows = data.rows;
+    const cols = data.cols;
+    const layout = data.layout;
+    
+    const seatChart = document.getElementById('seat-chart');
+    seatChart.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    
+    // For keeping track of groups (this can be expanded or persisted)
+    const groups = {};
+
+    // Create seat elements based on the saved layout
+    let seatElements = [];
+    for (let r = 0; r < rows; r++) {
+      seatElements[r] = [];
+      for (let c = 0; c < cols; c++) {
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        seat.dataset.row = r;
+        seat.dataset.col = c;
+        if (layout[r][c]) {
+          seat.textContent = r + '-' + c;
+          // Click to select/deselect seat for group assignment
+          seat.addEventListener('click', function() {
+            seat.classList.toggle('selected');
+          });
+        } else {
+          // Mark inactive seats (not part of the layout)
+          seat.style.backgroundColor = '#eee';
+        }
+        seatChart.appendChild(seat);
+        seatElements[r][c] = seat;
+      }
+    }
+    
+    document.getElementById('assign-btn').addEventListener('click', function() {
+      const groupName = document.getElementById('group-name').value.trim();
+      if (!groupName) {
+        alert("Please enter a group name.");
+        return;
+      }
+      // Find all seats that have been selected for grouping
+      const selectedSeats = document.querySelectorAll('.seat.selected');
+      if (selectedSeats.length === 0) {
+        alert("Please select at least one seat.");
+        return;
+      }
+      groups[groupName] = groups[groupName] || [];
+      selectedSeats.forEach(seat => {
+        // Remove the temporary selected style and mark as grouped
+        seat.classList.remove('selected');
+        seat.classList.add('grouped');
+        const row = seat.dataset.row;
+        const col = seat.dataset.col;
+        groups[groupName].push({row, col});
+        // Display the group name on the seat (you can customize this as needed)
+        seat.textContent = groupName;
+      });
+      console.log("Groups:", groups);
+      // Clear the group name input for the next assignment
+      document.getElementById('group-name').value = "";
+    });
+  </script>
+</body>
+</html>
