@@ -173,4 +173,254 @@
       <div class="tab-button" data-tab="groups-tab">Groups</div>
     </div>
     <div id="upload-tab" class="tab-content active">
-      <h3>U
+      <h3>Upload Background</h3>
+      <label for="bg-upload">Choose Image:</label>
+      <input type="file" id="bg-upload" accept="image/*">
+    </div>
+    <div id="groups-tab" class="tab-content">
+      <h3>Group Setup</h3>
+      <!-- Placeholder: You can add group assignment controls here -->
+      <p>(Group assignment controls go here.)</p>
+    </div>
+  </div>
+  
+  <!-- Button to toggle sidebar visibility -->
+  <button id="toggle-sidebar-btn">Toggle Sidebar</button>
+  
+  <!-- Main Container with Background and Layout -->
+  <div id="main-container">
+    <div id="background-container">
+      <!-- Background image is set via CSS -->
+      <div id="seat-overlay"></div>
+    </div>
+    <button id="add-division-btn">Add Division</button>
+    <button id="finalize-btn">Finalize Layout &amp; Proceed to Groups</button>
+  </div>
+  
+  <script>
+    /***********************
+     * Sidebar Tab Functionality
+     ***********************/
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Set active tab
+        tabButtons.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(tc => tc.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+    
+    // Toggle sidebar visibility
+    document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('hidden');
+    });
+    
+    /***********************
+     * Background Image Upload
+     ***********************/
+    document.getElementById('bg-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const dataURL = event.target.result;
+        document.getElementById('background-container').style.backgroundImage = 'url(' + dataURL + ')';
+        localStorage.setItem('auditoriumBackgroundImage', dataURL);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    /***********************
+     * Main Area: Division Management
+     ***********************/
+    const overlay = document.getElementById('seat-overlay');
+    let divisionCount = 0;
+    
+    // Simple draggable functionality for divisions
+    function makeDraggable(el) {
+      let startX = 0, startY = 0, initLeft = 0, initTop = 0;
+      const header = el.querySelector('.div-header');
+      header.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        initLeft = parseFloat(el.style.left) || 0;
+        initTop = parseFloat(el.style.top) || 0;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+      function onMouseMove(e) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        el.style.left = (initLeft + dx) + "px";
+        el.style.top = (initTop + dy) + "px";
+      }
+      function onMouseUp(e) {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+    }
+    
+    // Create a new Division (appears in the background overlay)
+    function createDivision() {
+      const div = document.createElement('div');
+      div.classList.add('division');
+      // Default size and position (can be repositioned via drag)
+      div.style.left = (20 + divisionCount * 30) + "px";
+      div.style.top = (20 + divisionCount * 30) + "px";
+      div.style.width = "300px";
+      div.style.height = "200px";
+      div.style.transform = "rotate(0deg)";
+      // Default style controls
+      div.style.border = "2px solid #888888";
+      div.style.backgroundColor = "#1e1e1e";
+      
+      // Division header (for dragging and naming)
+      const header = document.createElement('div');
+      header.classList.add('div-header');
+      header.textContent = "Division " + (divisionCount + 1);
+      div.appendChild(header);
+      
+      // Button to toggle the grid editor panel
+      const editBtn = document.createElement('button');
+      editBtn.textContent = "Edit Grid";
+      editBtn.style.margin = "4px";
+      editBtn.addEventListener('click', () => {
+        gridEditor.classList.toggle('active');
+      });
+      
+      // Division style controls (for border and background)
+      const styleControls = document.createElement('div');
+      styleControls.classList.add('div-controls');
+      styleControls.innerHTML = `
+        Border Color: <input type="color" class="border-color-input" value="#888888">
+        Border Width: <input type="number" class="border-width-input" value="2" min="0">
+        Background Color: <input type="color" class="bg-color-input" value="#1e1e1e">
+        <button class="apply-style-btn">Apply Style</button>
+      `;
+      styleControls.querySelector('.apply-style-btn').addEventListener('click', () => {
+        const bColor = styleControls.querySelector('.border-color-input').value;
+        const bWidth = styleControls.querySelector('.border-width-input').value;
+        const bgColor = styleControls.querySelector('.bg-color-input').value;
+        div.style.border = bWidth + "px solid " + bColor;
+        div.style.backgroundColor = bgColor;
+      });
+      
+      // Grid editor panel (hidden by default)
+      const gridEditor = document.createElement('div');
+      gridEditor.classList.add('grid-editor');
+      // Controls for grid: button to add a row and a container for rows
+      gridEditor.innerHTML = `
+        <button class="add-row-btn">Add Row</button>
+        <div class="rows-container"></div>
+      `;
+      // Add functionality: when "Add Row" is clicked, add a row config
+      gridEditor.querySelector('.add-row-btn').addEventListener('click', () => {
+        addRowToDivision(div, gridEditor.querySelector('.rows-container'));
+      });
+      
+      // Append controls and editor to the division
+      div.appendChild(editBtn);
+      div.appendChild(styleControls);
+      div.appendChild(gridEditor);
+      
+      makeDraggable(div);
+      divisionCount++;
+      return div;
+    }
+    
+    // Adds a row configuration to a division's grid editor.
+    // Each row config allows you to set the number of chairs in that row.
+    function addRowToDivision(division, container) {
+      const rowConfig = document.createElement('div');
+      rowConfig.classList.add('grid-row');
+      rowConfig.innerHTML = `
+        Row: <input type="number" class="chairs-input" value="5" min="1">
+        <button class="update-row-btn">Update Row</button>
+      `;
+      // When Update Row is clicked, update the division’s seat grid preview
+      rowConfig.querySelector('.update-row-btn').addEventListener('click', () => {
+        updateDivisionGrid(division);
+      });
+      container.appendChild(rowConfig);
+      // Immediately update grid after adding a row
+      updateDivisionGrid(division);
+    }
+    
+    // Updates the seat grid preview inside a division based on its grid editor rows.
+    function updateDivisionGrid(division) {
+      const gridEditor = division.querySelector('.grid-editor');
+      const rowsContainer = gridEditor.querySelector('.rows-container');
+      // Build a new seat grid preview
+      let gridHTML = "";
+      rowsContainer.querySelectorAll('.grid-row').forEach((rowConfig, index) => {
+        const chairs = parseInt(rowConfig.querySelector('.chairs-input').value);
+        if (isNaN(chairs) || chairs < 1) return;
+        gridHTML += "<div>";
+        for (let i = 0; i < chairs; i++) {
+          gridHTML += `<div class="seat">${(index * chairs + i + 1)}</div>`;
+        }
+        gridHTML += "</div>";
+      });
+      // Append or create a container for the seat grid inside the division
+      let seatGrid = division.querySelector('.seat-grid');
+      if (!seatGrid) {
+        seatGrid = document.createElement('div');
+        seatGrid.classList.add('seat-grid');
+        division.appendChild(seatGrid);
+      }
+      seatGrid.innerHTML = gridHTML;
+      // Optionally, resize the division based on the grid size:
+      // Here, we assume each seat is 34px (30px + 2*2px margin) wide/high.
+      const rows = rowsContainer.querySelectorAll('.grid-row').length;
+      let maxChairs = 0;
+      rowsContainer.querySelectorAll('.grid-row').forEach(row => {
+        const chairs = parseInt(row.querySelector('.chairs-input').value);
+        if(chairs > maxChairs) maxChairs = chairs;
+      });
+      if(maxChairs > 0 && rows > 0) {
+        const newWidth = maxChairs * 34 + 20;  // add some padding
+        const newHeight = rows * 34 + 60; // plus header and controls
+        division.style.width = newWidth + "px";
+        division.style.height = newHeight + "px";
+      }
+    }
+    
+    // Global "Add Division" button
+    document.getElementById('add-division-btn').addEventListener('click', () => {
+      const newDiv = createDivision();
+      overlay.appendChild(newDiv);
+    });
+    
+    // Finalize Layout: Collect background and division data, store in localStorage, and redirect
+    document.getElementById('finalize-btn').addEventListener('click', () => {
+      const divisionsData = [];
+      overlay.querySelectorAll('.division').forEach(div => {
+        const rect = div.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        // For each division, store position, size, style, and grid HTML
+        divisionsData.push({
+          name: div.querySelector('.div-header').textContent,
+          x: rect.left - overlayRect.left,
+          y: rect.top - overlayRect.top,
+          width: div.offsetWidth,
+          height: div.offsetHeight,
+          border: div.style.border,
+          backgroundColor: div.style.backgroundColor,
+          seatGrid: div.querySelector('.seat-grid') ? div.querySelector('.seat-grid').innerHTML : ""
+        });
+      });
+      const layoutData = {
+        backgroundImage: localStorage.getItem('auditoriumBackgroundImage'),
+        divisions: divisionsData
+      };
+      localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
+      alert("Layout finalized and saved! Redirecting to Groups page...");
+      window.location.href = "groups.html";
+    });
+  </script>
+</body>
+</html>
