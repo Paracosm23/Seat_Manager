@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Setup Auditorium Layout</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #seat-chart {
+      display: grid;
+      grid-gap: 5px;
+      margin: 20px 0;
+    }
+    .seat {
+      width: 30px;
+      height: 30px;
+      border: 1px solid #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+    .selected {
+      background-color: #ff0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Setup Auditorium Layout</h1>
+  <p>Click seats to mark them as active in your auditorium layout.</p>
+  <div id="seat-chart"></div>
+  <button id="finalize-btn">Finalize Layout</button>
+  <script>
+    const rows = 10;
+    const cols = 20;
+    const seatChart = document.getElementById('seat-chart');
+    seatChart.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+
+    // Initialize a 2D array to store which seats are active (true/false)
+    let layout = [];
+    for (let r = 0; r < rows; r++) {
+      layout[r] = [];
+      for (let c = 0; c < cols; c++) {
+        layout[r][c] = false; // seat inactive by default
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        seat.dataset.row = r;
+        seat.dataset.col = c;
+        seat.addEventListener('click', function() {
+          // Toggle active state when seat is clicked
+          layout[r][c] = !layout[r][c];
+          seat.classList.toggle('selected');
+        });
+        seatChart.appendChild(seat);
+      }
+    }
+    
+    document.getElementById('finalize-btn').addEventListener('click', function() {
+      // Save layout to local storage so that groups.html can access it
+      localStorage.setItem('auditoriumLayout', JSON.stringify({rows, cols, layout}));
+      // Redirect to the groups page
+      window.location.href = 'groups.html';
+    });
+  </script>
+</body>
+</html>
