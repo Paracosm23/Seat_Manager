@@ -104,15 +104,25 @@
       cursor: move;
     }
     .final-division .grid-container {
-      padding: 4px;
+      position: relative;
+      /* This container will hold the row boxes absolutely */
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
-    /* Each row is in its own draggable box */
+    /* Each row is now in its own "row box" that is absolutely positioned and draggable */
     .row-box {
+      position: absolute;
       border: 1px dashed #555;
-      margin: 4px 0;
       padding: 2px;
       background-color: #222;
       cursor: move;
+    }
+    .row-box .row-header {
+      background-color: #444;
+      padding: 2px;
+      cursor: move;
+      font-size: 12px;
     }
     .row-box .seat {
       display: inline-block;
@@ -237,10 +247,10 @@
     });
     
     /*********** Draggable Functionality ***********/
-    function makeDraggable(el) {
+    function makeDraggable(el, handleSelector) {
       let startX = 0, startY = 0, initLeft = 0, initTop = 0;
-      const header = el.querySelector('.division-header') || el.querySelector('.row-box');
-      header.addEventListener('mousedown', (e) => {
+      const handle = el.querySelector(handleSelector) || el;
+      handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         startX = e.clientX;
         startY = e.clientY;
@@ -259,6 +269,21 @@
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
       }
+    }
+    
+    // Make row boxes draggable within their division.
+    function makeDraggableRow(rowEl) {
+      rowEl.style.position = "absolute";
+      // Create a small header for dragging if not already exists.
+      let header = rowEl.querySelector('.row-header');
+      if (!header) {
+        header = document.createElement('div');
+        header.classList.add('row-header');
+        header.textContent = "Row";
+        // Insert header at top of row box.
+        rowEl.insertBefore(header, rowEl.firstChild);
+      }
+      makeDraggable(rowEl, '.row-header');
     }
     
     /*********** Division Config in Sidebar ***********/
@@ -291,7 +316,7 @@
       });
       box.appendChild(addRowBtn);
       
-      // Button to generate/update final division box in main area
+      // Button to generate or update final division box in main area
       const genBtn = document.createElement('button');
       genBtn.textContent = "Generate/Update Division";
       genBtn.addEventListener('click', () => {
@@ -313,7 +338,7 @@
           finalDiv = createFinalDivision(divName, rows);
           box.generatedDivision = finalDiv;
           document.getElementById('seat-overlay').appendChild(finalDiv);
-          makeDraggable(finalDiv);
+          makeDraggable(finalDiv, '.division-header');
         } else {
           updateFinalDivision(finalDiv, divName, rows);
         }
@@ -363,62 +388,56 @@
     }
     
     /*********** Final Division Box in Main Area ***********/
-    // Each final division box displays the generated seat grid;
-    // Each row is contained in a "row-box" that is draggable (allowing reordering).
+    // This creates the final division box. Each row is in its own absolutely positioned row-box.
     function createFinalDivision(divName, rowsArray) {
       const divBox = document.createElement('div');
       divBox.classList.add('final-division');
+      // Default position; user can drag it.
       divBox.style.left = "50px";
       divBox.style.top = "50px";
-      // Initial size can be auto
-      // Create header (for display and dragging)
+      
+      // Division header (for display and dragging)
       const header = document.createElement('div');
       header.classList.add('division-header');
       header.textContent = divName;
       divBox.appendChild(header);
-      // Create container for rows
+      
+      // Container for rows (set relative so row boxes can be absolute)
       const gridContainer = document.createElement('div');
       gridContainer.classList.add('grid-container');
+      gridContainer.style.position = "relative";
+      gridContainer.style.width = "100%";
+      gridContainer.style.height = "100%";
       divBox.appendChild(gridContainer);
       
       // For each row, create a row-box
       rowsArray.forEach((numChairs, rowIndex) => {
         const rowBox = document.createElement('div');
         rowBox.classList.add('row-box');
-        rowBox.setAttribute("draggable", "true");
-        rowBox.dataset.rowIndex = rowIndex;
-        // Drag events for row reordering
-        rowBox.addEventListener("dragstart", (e) => {
-          e.dataTransfer.setData("text/plain", rowIndex);
-          rowBox.classList.add("dragging");
-        });
-        rowBox.addEventListener("dragend", () => {
-          rowBox.classList.remove("dragging");
-        });
-        rowBox.addEventListener("dragover", (e) => {
-          e.preventDefault();
-        });
-        rowBox.addEventListener("drop", (e) => {
-          e.preventDefault();
-          const dragging = document.querySelector(".row-box.dragging");
-          if (dragging && dragging !== rowBox) {
-            gridContainer.insertBefore(dragging, rowBox);
-          }
-        });
-        // Populate row-box with seat numbers
+        // Set initial position for the row box (stacked vertically)
+        rowBox.style.left = "0px";
+        rowBox.style.top = (rowIndex * 40) + "px";
+        // Create a header for dragging the row box
+        const rowHeader = document.createElement('div');
+        rowHeader.classList.add('row-header');
+        rowHeader.textContent = "Row " + (rowIndex + 1);
+        rowBox.appendChild(rowHeader);
+        // Create seat elements for this row – numbering restarts at 1
         for (let i = 0; i < numChairs; i++) {
           const seat = document.createElement('div');
           seat.classList.add('seat');
-          seat.textContent = (rowIndex * numChairs + i + 1);
+          seat.textContent = (i + 1);
           rowBox.appendChild(seat);
         }
         gridContainer.appendChild(rowBox);
+        // Make the row box freely draggable within the division
+        makeDraggableRow(rowBox);
       });
       
       return divBox;
     }
     
-    // Update an existing final division box with new name and rows configuration
+    // Update an existing final division box with new name and rows configuration.
     function updateFinalDivision(finalDiv, divName, rowsArray) {
       finalDiv.querySelector('.division-header').textContent = divName;
       const gridContainer = finalDiv.querySelector('.grid-container');
@@ -426,32 +445,20 @@
       rowsArray.forEach((numChairs, rowIndex) => {
         const rowBox = document.createElement('div');
         rowBox.classList.add('row-box');
-        rowBox.setAttribute("draggable", "true");
-        rowBox.dataset.rowIndex = rowIndex;
-        rowBox.addEventListener("dragstart", (e) => {
-          e.dataTransfer.setData("text/plain", rowIndex);
-          rowBox.classList.add("dragging");
-        });
-        rowBox.addEventListener("dragend", () => {
-          rowBox.classList.remove("dragging");
-        });
-        rowBox.addEventListener("dragover", (e) => {
-          e.preventDefault();
-        });
-        rowBox.addEventListener("drop", (e) => {
-          e.preventDefault();
-          const dragging = document.querySelector(".row-box.dragging");
-          if (dragging && dragging !== rowBox) {
-            gridContainer.insertBefore(dragging, rowBox);
-          }
-        });
+        rowBox.style.left = "0px";
+        rowBox.style.top = (rowIndex * 40) + "px";
+        const rowHeader = document.createElement('div');
+        rowHeader.classList.add('row-header');
+        rowHeader.textContent = "Row " + (rowIndex + 1);
+        rowBox.appendChild(rowHeader);
         for (let i = 0; i < numChairs; i++) {
           const seat = document.createElement('div');
           seat.classList.add('seat');
-          seat.textContent = (rowIndex * numChairs + i + 1);
+          seat.textContent = (i + 1);
           rowBox.appendChild(seat);
         }
         gridContainer.appendChild(rowBox);
+        makeDraggableRow(rowBox);
       });
     }
     
