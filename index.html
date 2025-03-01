@@ -67,9 +67,10 @@
       cursor: pointer;
       font-size: 0.8em;
     }
-    /* Active seat styling */
+    /* Active seat styling - highlighting removed */
     .seat.active {
-      background-color: #ff0;
+      /* Background highlighting has been removed */
+      /* background-color: #ff0; */
     }
     /* Button styling */
     button {
@@ -103,7 +104,7 @@
     let isDragging = false;
     document.addEventListener('mouseup', () => { isDragging = false; });
     
-    // Toggle a seat's active state
+    // Toggle a seat's active state (internally tracked, but no visual highlight)
     function toggleSeat(seat) {
       if (seat.dataset.active === "false") {
         seat.dataset.active = "true";
@@ -318,7 +319,8 @@
       document.getElementById('layout-editor').appendChild(division);
     });
     
-    // Finalize Layout: Gather the hierarchy data, generate a PNG, and save both to local storage
+    // Finalize Layout: Gather the hierarchy data, generate a PNG, save both to localStorage,
+    // and then redirect to the group page.
     document.getElementById('finalize-btn').addEventListener('click', () => {
       const layoutData = [];
       // Traverse each division
@@ -345,15 +347,17 @@
         layoutData.push(divisionData);
       });
       
-      // Save layout data
+      // Save layout data to localStorage
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
       
       // Use html2canvas to capture the layout editor as a PNG image
       html2canvas(document.getElementById('layout-editor')).then(canvas => {
         const imgData = canvas.toDataURL("image/png");
-        // Save the PNG data URL in local storage for later use (for example, on the group page)
+        // Save the PNG data URL in localStorage for later use (for example, on the group page)
         localStorage.setItem('auditoriumRoomLayoutImage', imgData);
-        alert("Layout finalized and PNG image saved!");
+        // Inform the user and then redirect to the group page
+        alert("Layout finalized and PNG image saved! Redirecting to Group page...");
+        window.location.href = "groups.html";
       }).catch(err => {
         console.error("Error generating image:", err);
         alert("Layout saved, but failed to generate PNG image.");
