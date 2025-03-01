@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>COCO-SSD Object Detection</title>
+    <title>Chair and Square Detection with COCO-SSD</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -18,27 +18,36 @@
       input[type="file"] {
         margin-top: 20px;
       }
+      button {
+        margin-top: 10px;
+        padding: 8px 12px;
+        font-size: 14px;
+        cursor: pointer;
+      }
       #status {
         margin-top: 10px;
       }
     </style>
-    <!-- Load TensorFlow.js and COCO-SSD from CDN -->
+    <!-- Load TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Load COCO-SSD Model -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
   </head>
   <body>
-    <h1>COCO-SSD Object Detection</h1>
-    <p>Upload an image to detect objects.</p>
+    <h1>Chair and Square Detection</h1>
+    <p>Upload an image to detect chairs or square objects.</p>
     <input type="file" id="image-upload" accept="image/*">
-    <p id="status">Loading model, please wait...</p>
+    <br>
+    <button id="download-btn">Download Predictions</button>
     <canvas id="canvas"></canvas>
+    <p id="status">Loading model, please wait...</p>
     
     <script>
       let model;
-      const statusEl = document.getElementById('status');
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      let pendingImage = null; // if an image is uploaded before model loads
+      const statusEl = document.getElementById("status");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      let pendingImage = null; // if an image is uploaded before the model loads
 
       // Load the COCO-SSD model
       cocoSsd.load().then(loadedModel => {
@@ -53,16 +62,25 @@
         console.error(err);
       });
 
-      // Process the image: draw it on the canvas and run detection
+      // Process the image: draw it and run detection
       function processImage(img) {
-        // Set canvas size to match image
+        // Resize canvas to match image dimensions
         canvas.width = img.width;
         canvas.height = img.height;
-        // Draw the image
+        // Draw the image on the canvas
         ctx.drawImage(img, 0, 0);
         // Run object detection
         model.detect(img).then(predictions => {
-          predictions.forEach(prediction => {
+          // Filter predictions: include "chair" objects or those with nearly square bounding boxes
+          const filtered = predictions.filter(prediction => {
+            const cls = prediction.class.toLowerCase();
+            if (cls === "chair") return true;
+            const [x, y, width, height] = prediction.bbox;
+            return Math.abs(width - height) < 20;
+          });
+          console.log("Filtered Predictions:", filtered);
+          // Draw bounding boxes for filtered predictions
+          filtered.forEach(prediction => {
             const [x, y, width, height] = prediction.bbox;
             ctx.strokeStyle = "red";
             ctx.lineWidth = 2;
@@ -72,6 +90,8 @@
             const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
             ctx.fillText(text, x, y > 10 ? y - 5 : 10);
           });
+          // Store the filtered predictions in localStorage
+          localStorage.setItem("lastDetections", JSON.stringify(filtered));
           statusEl.textContent = "Detection complete.";
         }).catch(err => {
           console.error("Detection error:", err);
@@ -80,7 +100,7 @@
       }
 
       // Handle file upload
-      document.getElementById('image-upload').addEventListener('change', (e) => {
+      document.getElementById("image-upload").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -90,13 +110,25 @@
             if (model) {
               processImage(img);
             } else {
-              statusEl.textContent = "Model not loaded yet. Processing image once ready...";
+              statusEl.textContent = "Model not loaded yet. Processing when ready...";
               pendingImage = img;
             }
           };
           img.src = event.target.result;
         };
         reader.readAsDataURL(file);
+      });
+
+      // Download predictions from localStorage as a JSON file
+      document.getElementById("download-btn").addEventListener("click", () => {
+        const predictions = localStorage.getItem("lastDetections") || "{}";
+        const blob = new Blob([predictions], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "predictions.json";
+        a.click();
+        URL.revokeObjectURL(url);
       });
     </script>
   </body>
