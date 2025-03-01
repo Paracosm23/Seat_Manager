@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>COCO-SSD Object Detection</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+      #canvas {
+        border: 1px solid #555;
+        margin-top: 20px;
+      }
+      input[type="file"] {
+        margin-top: 20px;
+      }
+    </style>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Load the COCO-SSD model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  </head>
+  <body>
+    <h1>COCO-SSD Object Detection</h1>
+    <p>Upload an image to detect objects.</p>
+    <input type="file" id="image-upload">
+    <canvas id="canvas"></canvas>
+    
+    <script>
+      let model;
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Load the COCO-SSD model
+      cocoSsd.load().then(loadedModel => {
+        model = loadedModel;
+        console.log("COCO-SSD model loaded.");
+      });
+
+      document.getElementById('image-upload').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            // Resize canvas to match image
+            canvas.width = img.width;
+            canvas.height = img.height;
+            // Draw the image on the canvas
+            ctx.drawImage(img, 0, 0);
+            // Run object detection
+            model.detect(img).then(predictions => {
+              console.log(predictions);
+              predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+                ctx.fillStyle = "red";
+                ctx.font = "16px Arial";
+                const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+                ctx.fillText(text, x, y > 10 ? y - 5 : 10);
+              });
+            });
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    </script>
+  </body>
+</html>
