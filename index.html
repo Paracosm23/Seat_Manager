@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor (Dark Mode)</title>
+  <title>Auditorium Layout Editor (Dark Mode) - Updated</title>
   <style>
     /* ---------- Global Styles & Dark Mode ---------- */
     body {
@@ -80,7 +80,7 @@
       background-position: center;
       margin: 0 auto;
     }
-    /* Overlay to hold final division boxes */
+    /* Overlay for final division boxes */
     #seat-overlay {
       position: absolute;
       top: 0;
@@ -89,22 +89,33 @@
       height: 100%;
       pointer-events: none;
     }
-    /* ---------- Final Division Box (Outcome) ---------- */
+    /* ---------- Final Division Box (Output) ---------- */
     .final-division {
       position: absolute;
       border: 2px solid #888;
       background-color: #1e1e1e;
       box-sizing: border-box;
       pointer-events: auto;
-      /* No setup controls appear here */
     }
-    .final-division .seat-row {
-      /* Each row in the grid; set draggable attribute later */
-      position: relative;
-      margin: 2px 0;
-      display: flex;
+    .final-division .division-header {
+      background-color: #333;
+      padding: 4px;
+      font-size: 14px;
+      cursor: move;
     }
-    .final-division .seat {
+    .final-division .grid-container {
+      padding: 4px;
+    }
+    /* Each row is in its own draggable box */
+    .row-box {
+      border: 1px dashed #555;
+      margin: 4px 0;
+      padding: 2px;
+      background-color: #222;
+      cursor: move;
+    }
+    .row-box .seat {
+      display: inline-block;
       width: 30px;
       height: 30px;
       margin: 2px;
@@ -114,9 +125,8 @@
       font-size: 0.8em;
       background-color: #2e2e2e;
       color: #e0e0e0;
-      cursor: move;
     }
-    /* ---------- Sidebar - Divisions Config ---------- */
+    /* ---------- Sidebar - Division Config ---------- */
     .division-config {
       border: 1px solid #888;
       padding: 8px;
@@ -127,26 +137,15 @@
       display: block;
       margin-top: 4px;
     }
-    .division-config input[type="number"],
-    .division-config input[type="text"],
-    .division-config input[type="color"] {
-      width: 60px;
-      margin-right: 4px;
-      background-color: #333;
-      color: #e0e0e0;
-      border: 1px solid #555;
-      padding: 2px;
-    }
+    .division-config input,
     .division-config button {
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
-      padding: 4px 8px;
-      cursor: pointer;
+      padding: 4px;
       font-size: 12px;
-      margin-top: 4px;
+      margin: 2px 0;
     }
-    /* Draggable row config list */
     .row-config {
       border: 1px dashed #555;
       padding: 4px;
@@ -170,7 +169,7 @@
   </style>
 </head>
 <body>
-  <!-- Sidebar with tabs -->
+  <!-- Sidebar with Tabs -->
   <div id="sidebar">
     <button id="toggle-sidebar-btn">☰</button>
     <div class="tab-buttons">
@@ -184,10 +183,10 @@
       <input type="file" id="bg-upload" accept="image/*">
     </div>
     <div id="divisions-tab" class="tab-content">
-      <h3>Divisions</h3>
+      <h3>Division Config</h3>
       <button id="add-division-config-btn">Add Division</button>
       <div id="division-config-list">
-        <!-- Division config boxes will be appended here -->
+        <!-- New division config boxes will be appended here -->
       </div>
     </div>
     <div id="groups-tab" class="tab-content">
@@ -224,7 +223,7 @@
       document.getElementById('sidebar').classList.toggle('hidden');
     });
     
-    /*********** Background Upload ***********/
+    /*********** Background Image Upload ***********/
     document.getElementById('bg-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -237,10 +236,34 @@
       reader.readAsDataURL(file);
     });
     
+    /*********** Draggable Functionality ***********/
+    function makeDraggable(el) {
+      let startX = 0, startY = 0, initLeft = 0, initTop = 0;
+      const header = el.querySelector('.division-header') || el.querySelector('.row-box');
+      header.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        initLeft = parseFloat(el.style.left) || 0;
+        initTop = parseFloat(el.style.top) || 0;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+      function onMouseMove(e) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        el.style.left = (initLeft + dx) + "px";
+        el.style.top = (initTop + dy) + "px";
+      }
+      function onMouseUp(e) {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+    }
+    
     /*********** Division Config in Sidebar ***********/
     const divisionConfigList = document.getElementById('division-config-list');
     
-    // Function to create a new division configuration box
     function createDivisionConfig() {
       const box = document.createElement('div');
       box.classList.add('division-config');
@@ -259,7 +282,7 @@
       rowList.classList.add('row-list');
       box.appendChild(rowList);
       
-      // Button to add a new row config
+      // Button to add a new row config (each row in its own box)
       const addRowBtn = document.createElement('button');
       addRowBtn.textContent = "Add Row";
       addRowBtn.addEventListener('click', () => {
@@ -268,14 +291,10 @@
       });
       box.appendChild(addRowBtn);
       
-      // Enable reordering of rows via HTML5 drag & drop
-      // (Row config elements will be made draggable in createRowConfig)
-      
-      // Button to generate the final division from this config
+      // Button to generate/update final division box in main area
       const genBtn = document.createElement('button');
-      genBtn.textContent = "Generate Division";
+      genBtn.textContent = "Generate/Update Division";
       genBtn.addEventListener('click', () => {
-        // Read division name and row data
         const divName = nameInput.value || "Unnamed Division";
         const rows = [];
         rowList.querySelectorAll('.row-config').forEach(rowDiv => {
@@ -285,26 +304,30 @@
           }
         });
         if (rows.length === 0) {
-          alert("Please add at least one row with valid number of chairs.");
+          alert("Please add at least one row with a valid number of chairs.");
           return;
         }
-        // Generate the final division box in the main area (seat-overlay)
-        const finalDivision = createFinalDivision(divName, rows);
-        document.getElementById('seat-overlay').appendChild(finalDivision);
-        // Optionally, remove this config box from the list
-        box.remove();
+        // Generate or update final division box
+        let finalDiv = box.generatedDivision;
+        if (!finalDiv) {
+          finalDiv = createFinalDivision(divName, rows);
+          box.generatedDivision = finalDiv;
+          document.getElementById('seat-overlay').appendChild(finalDiv);
+          makeDraggable(finalDiv);
+        } else {
+          updateFinalDivision(finalDiv, divName, rows);
+        }
       });
       box.appendChild(genBtn);
       
       return box;
     }
     
-    // Function to create a row config element (draggable for reordering)
+    // Create a row configuration element (draggable for reordering)
     function createRowConfig() {
       const rowDiv = document.createElement('div');
       rowDiv.classList.add('row-config');
       rowDiv.setAttribute("draggable", "true");
-      // Label and input for number of chairs
       const label = document.createElement('span');
       label.textContent = "Chairs:";
       rowDiv.appendChild(label);
@@ -314,7 +337,7 @@
       input.min = "1";
       rowDiv.appendChild(input);
       
-      // Drag events for reordering
+      // Drag events for reordering rows
       rowDiv.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData("text/plain", null);
         rowDiv.classList.add("dragging");
@@ -327,7 +350,6 @@
         const draggingElem = document.querySelector('.row-config.dragging');
         if (draggingElem && draggingElem !== rowDiv) {
           const parent = rowDiv.parentElement;
-          // Insert draggingElem before rowDiv if its position is above
           const rect = rowDiv.getBoundingClientRect();
           if (e.clientY < rect.top + rect.height / 2) {
             parent.insertBefore(draggingElem, rowDiv);
@@ -340,85 +362,114 @@
       return rowDiv;
     }
     
-    // "Add Division" button in Divisions tab
+    /*********** Final Division Box in Main Area ***********/
+    // Each final division box displays the generated seat grid;
+    // Each row is contained in a "row-box" that is draggable (allowing reordering).
+    function createFinalDivision(divName, rowsArray) {
+      const divBox = document.createElement('div');
+      divBox.classList.add('final-division');
+      divBox.style.left = "50px";
+      divBox.style.top = "50px";
+      // Initial size can be auto
+      // Create header (for display and dragging)
+      const header = document.createElement('div');
+      header.classList.add('division-header');
+      header.textContent = divName;
+      divBox.appendChild(header);
+      // Create container for rows
+      const gridContainer = document.createElement('div');
+      gridContainer.classList.add('grid-container');
+      divBox.appendChild(gridContainer);
+      
+      // For each row, create a row-box
+      rowsArray.forEach((numChairs, rowIndex) => {
+        const rowBox = document.createElement('div');
+        rowBox.classList.add('row-box');
+        rowBox.setAttribute("draggable", "true");
+        rowBox.dataset.rowIndex = rowIndex;
+        // Drag events for row reordering
+        rowBox.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", rowIndex);
+          rowBox.classList.add("dragging");
+        });
+        rowBox.addEventListener("dragend", () => {
+          rowBox.classList.remove("dragging");
+        });
+        rowBox.addEventListener("dragover", (e) => {
+          e.preventDefault();
+        });
+        rowBox.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const dragging = document.querySelector(".row-box.dragging");
+          if (dragging && dragging !== rowBox) {
+            gridContainer.insertBefore(dragging, rowBox);
+          }
+        });
+        // Populate row-box with seat numbers
+        for (let i = 0; i < numChairs; i++) {
+          const seat = document.createElement('div');
+          seat.classList.add('seat');
+          seat.textContent = (rowIndex * numChairs + i + 1);
+          rowBox.appendChild(seat);
+        }
+        gridContainer.appendChild(rowBox);
+      });
+      
+      return divBox;
+    }
+    
+    // Update an existing final division box with new name and rows configuration
+    function updateFinalDivision(finalDiv, divName, rowsArray) {
+      finalDiv.querySelector('.division-header').textContent = divName;
+      const gridContainer = finalDiv.querySelector('.grid-container');
+      gridContainer.innerHTML = "";
+      rowsArray.forEach((numChairs, rowIndex) => {
+        const rowBox = document.createElement('div');
+        rowBox.classList.add('row-box');
+        rowBox.setAttribute("draggable", "true");
+        rowBox.dataset.rowIndex = rowIndex;
+        rowBox.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", rowIndex);
+          rowBox.classList.add("dragging");
+        });
+        rowBox.addEventListener("dragend", () => {
+          rowBox.classList.remove("dragging");
+        });
+        rowBox.addEventListener("dragover", (e) => {
+          e.preventDefault();
+        });
+        rowBox.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const dragging = document.querySelector(".row-box.dragging");
+          if (dragging && dragging !== rowBox) {
+            gridContainer.insertBefore(dragging, rowBox);
+          }
+        });
+        for (let i = 0; i < numChairs; i++) {
+          const seat = document.createElement('div');
+          seat.classList.add('seat');
+          seat.textContent = (rowIndex * numChairs + i + 1);
+          rowBox.appendChild(seat);
+        }
+        gridContainer.appendChild(rowBox);
+      });
+    }
+    
+    /*********** Add Division Config Button ***********/
     document.getElementById('add-division-config-btn').addEventListener('click', () => {
       const newConfig = createDivisionConfig();
       divisionConfigList.appendChild(newConfig);
     });
     
-    /*********** Generate Final Division Box in Main Area ***********/
-    // This function creates a final division box (output) based on the division name and an array of rows
-    // Each row will be a draggable row within the division.
-    function createFinalDivision(divName, rowsArray) {
-      const divBox = document.createElement('div');
-      divBox.classList.add('final-division');
-      // Set default position; you might let the user reposition later if desired.
-      divBox.style.left = "50px";
-      divBox.style.top = "50px";
-      
-      // Create a header with the division name (display only)
-      const header = document.createElement('div');
-      header.style.backgroundColor = "#333";
-      header.style.padding = "4px";
-      header.style.fontSize = "14px";
-      header.textContent = divName;
-      divBox.appendChild(header);
-      
-      // Container for the seat grid (each row)
-      const gridContainer = document.createElement('div');
-      gridContainer.classList.add('grid-container');
-      divBox.appendChild(gridContainer);
-      
-      // For each row in rowsArray, create a row element with the specified number of chairs
-      rowsArray.forEach((numChairs, rowIndex) => {
-        const rowDiv = document.createElement('div');
-        rowDiv.classList.add('seat-row');
-        rowDiv.setAttribute("draggable", "true");
-        // Set up HTML5 drag events to allow reordering rows within the grid
-        rowDiv.addEventListener("dragstart", (e) => {
-          e.dataTransfer.setData("text/plain", rowIndex);
-          rowDiv.classList.add("dragging");
-        });
-        rowDiv.addEventListener("dragend", () => {
-          rowDiv.classList.remove("dragging");
-        });
-        rowDiv.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          // Allow dropping to reorder rows
-        });
-        rowDiv.addEventListener("drop", (e) => {
-          e.preventDefault();
-          const dragging = document.querySelector(".seat-row.dragging");
-          if (dragging && dragging !== rowDiv) {
-            gridContainer.insertBefore(dragging, rowDiv);
-          }
-        });
-        // Create seat elements for this row
-        for (let i = 0; i < numChairs; i++) {
-          const seat = document.createElement('div');
-          seat.classList.add('seat');
-          seat.textContent = (rowIndex * numChairs + i + 1);
-          rowDiv.appendChild(seat);
-        }
-        gridContainer.appendChild(rowDiv);
-      });
-      
-      // Optionally, set the division box size based on gridContainer size
-      // (Here we simply let it size to its content)
-      
-      return divBox;
-    }
-    
     /*********** Finalize Layout ***********/
     document.getElementById('finalize-btn').addEventListener('click', () => {
-      // Collect background image and final divisions from the main area
       const bgImage = localStorage.getItem('auditoriumBackgroundImage') || "";
       const divisions = [];
       document.querySelectorAll('.final-division').forEach(div => {
         const rect = div.getBoundingClientRect();
         const overlayRect = document.getElementById('seat-overlay').getBoundingClientRect();
         divisions.push({
-          name: div.querySelector("div").textContent,
+          name: div.querySelector('.division-header').textContent,
           x: rect.left - overlayRect.left,
           y: rect.top - overlayRect.top,
           width: div.offsetWidth,
