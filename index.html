@@ -441,4 +441,283 @@
       addRowBtn.textContent = "Add Row";
       addRowBtn.addEventListener('click', () => {
         const rowConfig = createRowConfig();
-        rowList.appendChild(
+        rowList.appendChild(rowConfig);
+      });
+      box.appendChild(addRowBtn);
+      
+      // Button to generate/update final division box in main area
+      const genBtn = document.createElement('button');
+      genBtn.textContent = "Generate/Update Division";
+      genBtn.addEventListener('click', () => {
+        const divName = nameInput.value || "Unnamed Division";
+        const rows = [];
+        rowList.querySelectorAll('.row-config').forEach(rowDiv => {
+          const chairs = parseInt(rowDiv.querySelector('.chairs-input').value);
+          const rotation = parseFloat(rowDiv.querySelector('.rotation-input').value) || 0;
+          const height = parseFloat(rowDiv.querySelector('.height-input').value) || 40;
+          const curve = parseFloat(rowDiv.querySelector('.curve-input').value) || 0;
+          if (!isNaN(chairs) && chairs > 0) {
+            rows.push({chairs, rotation, height, curve});
+          }
+        });
+        if (rows.length === 0) {
+          alert("Please add at least one row with valid settings.");
+          return;
+        }
+        // Generate or update final division box
+        let finalDiv = box.generatedDivision;
+        if (!finalDiv) {
+          finalDiv = createFinalDivision(divName, rows);
+          box.generatedDivision = finalDiv;
+          document.getElementById('seat-overlay').appendChild(finalDiv);
+          // Make the division draggable by its nameplate
+          makeDraggable(finalDiv, '.division-nameplate');
+        } else {
+          updateFinalDivision(finalDiv, divName, rows);
+        }
+      });
+      box.appendChild(genBtn);
+      
+      return box;
+    }
+    
+    // Create a row configuration element with additional controls (chairs, rotation, height, curve)
+    function createRowConfig() {
+      const rowDiv = document.createElement('div');
+      rowDiv.classList.add('row-config');
+      rowDiv.setAttribute("draggable", "true");
+      
+      // Chairs input
+      const chairsLabel = document.createElement('span');
+      chairsLabel.textContent = "Chairs:";
+      rowDiv.appendChild(chairsLabel);
+      const chairsInput = document.createElement('input');
+      chairsInput.type = "number";
+      chairsInput.value = "5";
+      chairsInput.min = "1";
+      chairsInput.classList.add('chairs-input');
+      rowDiv.appendChild(chairsInput);
+      
+      // Rotation controls: slider and numeric
+      const rotGroup = document.createElement('div');
+      rotGroup.classList.add('param-group');
+      const rotLabel = document.createElement('label');
+      rotLabel.textContent = "Rotation:";
+      rotGroup.appendChild(rotLabel);
+      const rotSlider = document.createElement('input');
+      rotSlider.type = "range";
+      rotSlider.min = "0";
+      rotSlider.max = "360";
+      rotSlider.value = "0";
+      rotSlider.classList.add('rotation-slider');
+      rotGroup.appendChild(rotSlider);
+      const rotNum = document.createElement('input');
+      rotNum.type = "number";
+      rotNum.min = "0";
+      rotNum.max = "360";
+      rotNum.value = "0";
+      rotNum.classList.add('rotation-input');
+      rotGroup.appendChild(rotNum);
+      // Sync slider and numeric
+      rotSlider.addEventListener('input', () => { rotNum.value = rotSlider.value; });
+      rotNum.addEventListener('input', () => { rotSlider.value = rotNum.value; });
+      rowDiv.appendChild(rotGroup);
+      
+      // Height controls: slider and numeric
+      const heightGroup = document.createElement('div');
+      heightGroup.classList.add('param-group');
+      const heightLabel = document.createElement('label');
+      heightLabel.textContent = "Height:";
+      heightGroup.appendChild(heightLabel);
+      const heightSlider = document.createElement('input');
+      heightSlider.type = "range";
+      heightSlider.min = "20";
+      heightSlider.max = "100";
+      heightSlider.value = "40";
+      heightSlider.classList.add('height-slider');
+      heightGroup.appendChild(heightSlider);
+      const heightNum = document.createElement('input');
+      heightNum.type = "number";
+      heightNum.min = "20";
+      heightNum.max = "100";
+      heightNum.value = "40";
+      heightNum.classList.add('height-input');
+      heightGroup.appendChild(heightNum);
+      heightSlider.addEventListener('input', () => { heightNum.value = heightSlider.value; });
+      heightNum.addEventListener('input', () => { heightSlider.value = heightNum.value; });
+      rowDiv.appendChild(heightGroup);
+      
+      // Curve controls: slider and numeric (applied as border-radius)
+      const curveGroup = document.createElement('div');
+      curveGroup.classList.add('param-group');
+      const curveLabel = document.createElement('label');
+      curveLabel.textContent = "Curve:";
+      curveGroup.appendChild(curveLabel);
+      const curveSlider = document.createElement('input');
+      curveSlider.type = "range";
+      curveSlider.min = "0";
+      curveSlider.max = "50";
+      curveSlider.value = "0";
+      curveSlider.classList.add('curve-slider');
+      curveGroup.appendChild(curveSlider);
+      const curveNum = document.createElement('input');
+      curveNum.type = "number";
+      curveNum.min = "0";
+      curveNum.max = "50";
+      curveNum.value = "0";
+      curveNum.classList.add('curve-input');
+      curveGroup.appendChild(curveNum);
+      curveSlider.addEventListener('input', () => { curveNum.value = curveSlider.value; });
+      curveNum.addEventListener('input', () => { curveSlider.value = curveNum.value; });
+      rowDiv.appendChild(curveGroup);
+      
+      // Drag events for reordering rows
+      rowDiv.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData("text/plain", null);
+        rowDiv.classList.add("dragging");
+      });
+      rowDiv.addEventListener('dragend', () => {
+        rowDiv.classList.remove("dragging");
+      });
+      rowDiv.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingElem = document.querySelector('.row-config.dragging');
+        if (draggingElem && draggingElem !== rowDiv) {
+          const parent = rowDiv.parentElement;
+          const rect = rowDiv.getBoundingClientRect();
+          if (e.clientY < rect.top + rect.height / 2) {
+            parent.insertBefore(draggingElem, rowDiv);
+          } else {
+            parent.insertBefore(draggingElem, rowDiv.nextSibling);
+          }
+        }
+      });
+      
+      return rowDiv;
+    }
+    
+    /*********** Final Division Box in Main Area ***********/
+    // Create a final division box from division name and an array of row config objects.
+    function createFinalDivision(divName, rowsArray) {
+      const divBox = document.createElement('div');
+      divBox.classList.add('final-division');
+      divBox.style.left = "50px";
+      divBox.style.top = "50px";
+      
+      // Create a draggable division nameplate
+      const nameplate = document.createElement('div');
+      nameplate.classList.add('division-nameplate');
+      nameplate.textContent = divName;
+      nameplate.style.cursor = "move";
+      divBox.appendChild(nameplate);
+      makeDraggable(nameplate);
+      
+      // Container for row boxes
+      const gridContainer = document.createElement('div');
+      gridContainer.classList.add('grid-container');
+      gridContainer.style.position = "relative";
+      divBox.appendChild(gridContainer);
+      
+      // For each row, create a row-box with the given parameters
+      rowsArray.forEach((rowData, rowIndex) => {
+        const rowBox = createRowBox(rowIndex, rowData);
+        gridContainer.appendChild(rowBox);
+      });
+      
+      return divBox;
+    }
+    
+    // Create a row box from a row config object (with chairs, rotation, height, curve)
+    function createRowBox(rowIndex, rowData) {
+      const rowBox = document.createElement('div');
+      rowBox.classList.add('row-box');
+      rowBox.style.left = "0px";
+      rowBox.style.top = (rowIndex * 50) + "px";
+      // Width is determined by number of chairs (34px each) plus 40px for label
+      rowBox.style.width = (rowData.chairs * 34 + 40) + "px";
+      rowBox.style.height = rowData.height + "px";
+      rowBox.style.borderRadius = rowData.curve + "px";
+      // Apply rotation via CSS transform
+      rowBox.style.transform = "rotate(" + rowData.rotation + "deg)";
+      rowBox.setAttribute('data-rotation', rowData.rotation);
+      
+      // Row number label attached at top-left inside the box
+      const rowNumber = document.createElement('div');
+      rowNumber.classList.add('row-number');
+      rowNumber.textContent = "Row " + (rowIndex + 1);
+      rowBox.appendChild(rowNumber);
+      
+      // Row content container
+      const rowContent = document.createElement('div');
+      rowContent.classList.add('row-content');
+      rowContent.style.width = "calc(100% - 40px)";
+      rowContent.style.height = "100%";
+      for (let i = 0; i < rowData.chairs; i++) {
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        seat.textContent = (i + 1);
+        rowContent.appendChild(seat);
+      }
+      rowBox.appendChild(rowContent);
+      
+      // Resize handle (bottom-right) and rotate handle (top-right); appear only on hover
+      const resizeHandle = document.createElement('div');
+      resizeHandle.classList.add('resize-handle');
+      rowBox.appendChild(resizeHandle);
+      makeResizable(rowBox, resizeHandle);
+      
+      const rotateHandle = document.createElement('div');
+      rotateHandle.classList.add('rotate-handle');
+      rowBox.appendChild(rotateHandle);
+      makeRotatable(rowBox, rotateHandle);
+      
+      // Make row box draggable by its border
+      makeDraggableRow(rowBox);
+      
+      return rowBox;
+    }
+    
+    // Update an existing final division box with new settings
+    function updateFinalDivision(finalDiv, divName, rowsArray) {
+      finalDiv.querySelector('.division-nameplate').textContent = divName;
+      const gridContainer = finalDiv.querySelector('.grid-container');
+      gridContainer.innerHTML = "";
+      rowsArray.forEach((rowData, rowIndex) => {
+        const rowBox = createRowBox(rowIndex, rowData);
+        gridContainer.appendChild(rowBox);
+      });
+    }
+    
+    /*********** Add Division Config Button ***********/
+    document.getElementById('add-division-config-btn').addEventListener('click', () => {
+      const newConfig = createDivisionConfig();
+      divisionConfigList.appendChild(newConfig);
+    });
+    
+    /*********** Finalize Layout ***********/
+    document.getElementById('finalize-btn').addEventListener('click', () => {
+      const bgImage = localStorage.getItem('auditoriumBackgroundImage') || "";
+      const divisions = [];
+      document.querySelectorAll('.final-division').forEach(div => {
+        const rect = div.getBoundingClientRect();
+        const overlayRect = document.getElementById('seat-overlay').getBoundingClientRect();
+        divisions.push({
+          name: div.querySelector('.division-nameplate').textContent,
+          x: rect.left - overlayRect.left,
+          y: rect.top - overlayRect.top,
+          width: div.offsetWidth,
+          height: div.offsetHeight,
+          gridHTML: div.querySelector('.grid-container') ? div.querySelector('.grid-container').innerHTML : ""
+        });
+      });
+      const layoutData = {
+        backgroundImage: bgImage,
+        divisions: divisions
+      };
+      localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
+      alert("Layout finalized and saved! Redirecting to Groups page...");
+      window.location.href = "groups.html";
+    });
+  </script>
+</body>
+</html>
