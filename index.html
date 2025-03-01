@@ -36,9 +36,9 @@
       overflow-y: auto;
       transition: width 0.3s ease;
       position: relative;
-      margin-left: 40px; /* leave space for hamburger icon */
+      margin-left: 40px;
     }
-    /* When collapsed, the sidebar shrinks but tabs remain visible */
+    /* When collapsed, sidebar shrinks to 50px but tabs remain visible */
     #sidebar.collapsed {
       width: 50px;
     }
@@ -86,9 +86,6 @@
       background-position: center;
       margin: 0 auto;
     }
-    /* ---------- Background Zoom via Scroll Wheel ---------- */
-    /* The background image zoom (via CSS background-size) is adjusted on wheel events */
-    
     /* ---------- Overlay for Final Division Boxes ---------- */
     #seat-overlay {
       position: absolute;
@@ -106,7 +103,6 @@
       box-sizing: border-box;
       pointer-events: auto;
     }
-    /* Draggable Division Nameplate (separate from the box) */
     .division-nameplate {
       position: absolute;
       top: -30px;
@@ -124,7 +120,6 @@
       cursor: move;
       overflow: hidden;
     }
-    /* Row number label inside row box (top-left) */
     .row-number {
       position: absolute;
       top: 0;
@@ -138,18 +133,17 @@
       background-color: rgba(0,0,0,0.5);
       z-index: 2;
     }
-    /* Row content fills the remaining space; its left offset depends on whether row name is shown */
     .row-content {
       position: absolute;
       top: 0;
       right: 0;
       bottom: 0;
+      padding: 2px;
+      box-sizing: border-box;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-evenly;
-      padding: 2px;
-      box-sizing: border-box;
     }
     .seat {
       flex: 1 1 0;
@@ -162,7 +156,6 @@
       background-color: #2e2e2e;
       color: #e0e0e0;
     }
-    /* Resize and rotate handles for rows – only visible on hover */
     .resize-handle,
     .rotate-handle {
       opacity: 0;
@@ -222,7 +215,6 @@
     .row-config span {
       margin-right: 4px;
     }
-    /* Parameter groups for rotation, height, and offset */
     .param-group {
       display: flex;
       align-items: center;
@@ -239,7 +231,6 @@
       width: 50px;
       margin-left: 4px;
     }
-    /* Checkbox for showing/hiding row name */
     .showname-group {
       margin-top: 4px;
     }
@@ -272,7 +263,6 @@
       <input type="file" id="bg-upload" accept="image/*">
       <div id="bg-zoom-container">
         <p>Scroll over background to zoom</p>
-        <!-- Download Config Button -->
         <button id="download-config-btn">Download Config</button>
       </div>
     </div>
@@ -312,7 +302,7 @@
       });
     });
     
-    // Toggle sidebar: collapse to 50px width (content hidden)
+    // Toggle sidebar: collapse to 50px width instead of fully hiding.
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('collapsed');
     });
@@ -330,7 +320,6 @@
       };
       reader.readAsDataURL(file);
     });
-    // Zoom with scroll wheel on background-container
     document.getElementById('background-container').addEventListener('wheel', function(e) {
       e.preventDefault();
       let currentSize = parseFloat(window.getComputedStyle(this).backgroundSize) || 100;
@@ -343,7 +332,7 @@
       this.style.backgroundSize = currentSize + "%";
     });
     
-    /*********** Download Config File Button ***********/
+    /*********** Download Config File ***********/
     document.getElementById('download-config-btn').addEventListener('click', () => {
       const config = localStorage.getItem('auditoriumRoomLayout') || "{}";
       const blob = new Blob([config], { type: "application/json" });
@@ -474,7 +463,7 @@
       });
       box.appendChild(addRowBtn);
       
-      // Parameter groups for Rotation, Height, and Offset
+      // Parameter groups for Rotation, Height, and Offset (for all rows in this division)
       const rotGroup = document.createElement('div');
       rotGroup.classList.add('param-group');
       const rotLabel = document.createElement('label');
@@ -521,7 +510,6 @@
       heightNum.addEventListener('input', () => { heightSlider.value = heightNum.value; });
       box.appendChild(heightGroup);
       
-      // New parameter group for Chairs Offset
       const offsetGroup = document.createElement('div');
       offsetGroup.classList.add('param-group');
       const offsetLabel = document.createElement('label');
@@ -565,7 +553,7 @@
           alert("Please add at least one row with valid settings.");
           return;
         }
-        // Generate or update final division box
+        // Apply the division-level rotation, height, and offset to each row if desired (this example uses row-level settings only)
         let finalDiv = box.generatedDivision;
         if (!finalDiv) {
           finalDiv = createFinalDivision(divName, rows);
@@ -578,29 +566,19 @@
       });
       box.appendChild(genBtn);
       
-      // Delete Division Button
-      const delDivBtn = document.createElement('button');
-      delDivBtn.textContent = "Delete Division";
-      delDivBtn.addEventListener('click', () => {
-        if (box.generatedDivision) {
-          box.generatedDivision.remove();
-        }
-        box.remove();
-      });
-      box.appendChild(delDivBtn);
-      
       return box;
     }
     
-    // Create a row configuration element with controls for chairs, rotation, height, offset, and show name checkbox; plus a delete button.
+    // Create a row configuration element with controls and a delete button.
     function createRowConfig() {
       const rowDiv = document.createElement('div');
       rowDiv.classList.add('row-config');
       rowDiv.setAttribute("draggable", "true");
       
-      const label = document.createElement('span');
-      label.textContent = "Chairs:";
-      rowDiv.appendChild(label);
+      // Chairs input
+      const chairsLabel = document.createElement('span');
+      chairsLabel.textContent = "Chairs:";
+      rowDiv.appendChild(chairsLabel);
       const chairsInput = document.createElement('input');
       chairsInput.type = "number";
       chairsInput.value = "5";
@@ -680,7 +658,7 @@
       offsetNum.addEventListener('input', () => { offsetSlider.value = offsetNum.value; });
       rowDiv.appendChild(offsetGroup);
       
-      // Checkbox for showing/hiding row name
+      // Checkbox for showing row name
       const showNameGroup = document.createElement('div');
       showNameGroup.classList.add('showname-group');
       const showNameLabel = document.createElement('label');
@@ -694,7 +672,7 @@
       delRowBtn.addEventListener('click', () => { rowDiv.remove(); });
       rowDiv.appendChild(delRowBtn);
       
-      // Drag events for reordering row configs
+      // Drag events for reordering
       rowDiv.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData("text/plain", null);
         rowDiv.classList.add("dragging");
@@ -720,14 +698,13 @@
     }
     
     /*********** Final Division Box in Main Area ***********/
-    // Create a final division box from division name and an array of row config objects.
     function createFinalDivision(divName, rowsArray) {
       const divBox = document.createElement('div');
       divBox.classList.add('final-division');
       divBox.style.left = "50px";
       divBox.style.top = "50px";
       
-      // Create a draggable division nameplate (separate from the box)
+      // Draggable division nameplate
       const nameplate = document.createElement('div');
       nameplate.classList.add('division-nameplate');
       nameplate.textContent = divName;
@@ -741,7 +718,7 @@
       gridContainer.style.position = "relative";
       divBox.appendChild(gridContainer);
       
-      // For each row config object, create a row box
+      // Create row boxes for each row config
       rowsArray.forEach((rowData, rowIndex) => {
         const rowBox = createRowBox(rowIndex, rowData);
         gridContainer.appendChild(rowBox);
@@ -750,20 +727,19 @@
       return divBox;
     }
     
-    // Create a row box from a row config object
     function createRowBox(rowIndex, rowData) {
       const rowBox = document.createElement('div');
       rowBox.classList.add('row-box');
       rowBox.style.left = "0px";
       rowBox.style.top = (rowIndex * 50) + "px";
-      // Width: number of chairs * 34 plus space for row label if shown plus offset
+      // Calculate width: (chairs * 34) + (40 if row name shown) + offset
       const extra = rowData.showName ? 40 : 0;
       rowBox.style.width = (rowData.chairs * 34 + extra + rowData.offset) + "px";
       rowBox.style.height = rowData.height + "px";
       rowBox.style.transform = "rotate(" + rowData.rotation + "deg)";
       rowBox.setAttribute('data-rotation', rowData.rotation);
       
-      // If row name is to be shown, add row number label and set row-content left accordingly
+      // Row number label (if showName is true)
       if (rowData.showName) {
         const rowNumber = document.createElement('div');
         rowNumber.classList.add('row-number');
@@ -771,14 +747,10 @@
         rowBox.appendChild(rowNumber);
       }
       
-      // Row content container for seats:
+      // Row content container
       const rowContent = document.createElement('div');
       rowContent.classList.add('row-content');
-      if (rowData.showName) {
-        rowContent.style.left = (40 + rowData.offset) + "px";
-      } else {
-        rowContent.style.left = rowData.offset + "px";
-      }
+      rowContent.style.left = rowData.showName ? (40 + rowData.offset) + "px" : rowData.offset + "px";
       rowContent.style.width = "calc(100% - " + (rowData.showName ? (40 + rowData.offset) : rowData.offset) + "px)";
       rowContent.style.height = "100%";
       for (let i = 0; i < rowData.chairs; i++) {
@@ -789,13 +761,12 @@
       }
       rowBox.appendChild(rowContent);
       
-      // Resize handle (bottom-right), visible on hover
+      // Resize and rotate handles (only visible on hover)
       const resizeHandle = document.createElement('div');
       resizeHandle.classList.add('resize-handle');
       rowBox.appendChild(resizeHandle);
       makeResizable(rowBox, resizeHandle);
       
-      // Rotate handle (top-right), visible on hover
       const rotateHandle = document.createElement('div');
       rotateHandle.classList.add('rotate-handle');
       rowBox.appendChild(rotateHandle);
@@ -807,7 +778,6 @@
       return rowBox;
     }
     
-    // Update an existing final division box with new name and row configs.
     function updateFinalDivision(finalDiv, divName, rowsArray) {
       finalDiv.querySelector('.division-nameplate').textContent = divName;
       const gridContainer = finalDiv.querySelector('.grid-container');
