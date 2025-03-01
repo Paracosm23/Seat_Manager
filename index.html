@@ -2,67 +2,231 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Setup Auditorium Layout</title>
+  <title>Auditorium Layout Editor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
     }
-    #seat-chart {
-      display: grid;
-      grid-gap: 5px;
-      margin: 20px 0;
+    /* Overall editor container */
+    #layout-editor {
+      margin-top: 20px;
     }
+    /* Division container styling */
+    .division {
+      border: 2px solid #444;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+    .division > .header {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    /* Subdivision container styling */
+    .subdivision {
+      border: 1px dashed #0077cc;
+      padding: 10px;
+      margin: 10px;
+    }
+    .subdivision > .header {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    /* Row container styling */
+    .seat-row {
+      display: flex;
+      margin: 5px 0;
+    }
+    /* Seat styling */
     .seat {
       width: 30px;
       height: 30px;
       border: 1px solid #999;
+      margin-right: 2px;
       display: flex;
       align-items: center;
       justify-content: center;
+      user-select: none;
       cursor: pointer;
-      font-size: 0.8em;
     }
-    .selected {
+    /* Active seats */
+    .seat.active {
       background-color: #ff0;
+    }
+    /* Buttons styling */
+    button {
+      margin: 5px 0;
     }
   </style>
 </head>
 <body>
-  <h1>Setup Auditorium Layout</h1>
-  <p>Click seats to mark them as active in your auditorium layout.</p>
-  <div id="seat-chart"></div>
-  <button id="finalize-btn">Finalize Layout</button>
+  <h1>Auditorium Layout Editor</h1>
+  <p>
+    Build your room by adding Divisions. Inside each division, add Subdivisions,
+    and then add Rows of Seats. You can drag the mouse (click and move) over seats to select them.
+  </p>
+  
+  <!-- A button to add a new division -->
+  <div id="controls">
+    <button id="add-division-btn">Add Division</button>
+  </div>
+  
+  <!-- Main editor container -->
+  <div id="layout-editor"></div>
+  
+  <!-- Finalize Layout Button -->
+  <button id="finalize-btn" style="margin-top:20px;">Finalize Layout</button>
+  
   <script>
-    const rows = 10;
-    const cols = 20;
-    const seatChart = document.getElementById('seat-chart');
-    seatChart.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
-
-    // Initialize a 2D array to store which seats are active (true/false)
-    let layout = [];
-    for (let r = 0; r < rows; r++) {
-      layout[r] = [];
-      for (let c = 0; c < cols; c++) {
-        layout[r][c] = false; // seat inactive by default
+    // Global flag for drag selection
+    let isDragging = false;
+    
+    // When the user releases the mouse anywhere, stop dragging
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+    
+    // Returns a new division container element
+    function createDivision() {
+      const division = document.createElement('div');
+      division.classList.add('division');
+      
+      // Header with division name input and add subdivision button
+      const header = document.createElement('div');
+      header.classList.add('header');
+      
+      const divNameInput = document.createElement('input');
+      divNameInput.type = "text";
+      divNameInput.placeholder = "Division Name";
+      header.appendChild(divNameInput);
+      
+      const addSubdivBtn = document.createElement('button');
+      addSubdivBtn.textContent = "Add Subdivision";
+      addSubdivBtn.addEventListener('click', () => {
+        const subdivision = createSubdivision();
+        division.appendChild(subdivision);
+      });
+      header.appendChild(addSubdivBtn);
+      
+      division.appendChild(header);
+      return division;
+    }
+    
+    // Returns a new subdivision container element
+    function createSubdivision() {
+      const subdivision = document.createElement('div');
+      subdivision.classList.add('subdivision');
+      
+      // Header with subdivision name input and add row button
+      const header = document.createElement('div');
+      header.classList.add('header');
+      
+      const subDivNameInput = document.createElement('input');
+      subDivNameInput.type = "text";
+      subDivNameInput.placeholder = "Subdivision Name";
+      header.appendChild(subDivNameInput);
+      
+      const addRowBtn = document.createElement('button');
+      addRowBtn.textContent = "Add Row";
+      addRowBtn.addEventListener('click', () => {
+        let seatCount = prompt("Enter number of seats for this row:");
+        seatCount = parseInt(seatCount);
+        if (!isNaN(seatCount) && seatCount > 0) {
+          const row = createRow(seatCount);
+          subdivision.appendChild(row);
+        } else {
+          alert("Invalid number of seats.");
+        }
+      });
+      header.appendChild(addRowBtn);
+      
+      subdivision.appendChild(header);
+      return subdivision;
+    }
+    
+    // Returns a new row (div) with a specified number of seats
+    function createRow(seatCount) {
+      const rowDiv = document.createElement('div');
+      rowDiv.classList.add('seat-row');
+      
+      for (let i = 0; i < seatCount; i++) {
         const seat = document.createElement('div');
         seat.classList.add('seat');
-        seat.dataset.row = r;
-        seat.dataset.col = c;
-        seat.addEventListener('click', function() {
-          // Toggle active state when seat is clicked
-          layout[r][c] = !layout[r][c];
-          seat.classList.toggle('selected');
+        seat.textContent = i + 1;
+        // Each seat is not active by default
+        seat.dataset.active = "false";
+        
+        // Start drag selection on mousedown
+        seat.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          toggleSeat(seat);
         });
-        seatChart.appendChild(seat);
+        // If dragging and the mouse moves over a seat, select it
+        seat.addEventListener('mouseover', (e) => {
+          if (isDragging && seat.dataset.active === "false") {
+            toggleSeat(seat);
+          }
+        });
+        // Also allow click to toggle (in case a single click is preferred)
+        seat.addEventListener('click', (e) => {
+          // Prevent click event from interfering with drag
+          toggleSeat(seat);
+        });
+        
+        rowDiv.appendChild(seat);
+      }
+      
+      return rowDiv;
+    }
+    
+    // Toggles a seat's active state (selected/unselected)
+    function toggleSeat(seat) {
+      if (seat.dataset.active === "false") {
+        seat.dataset.active = "true";
+        seat.classList.add('active');
+      } else {
+        seat.dataset.active = "false";
+        seat.classList.remove('active');
       }
     }
     
-    document.getElementById('finalize-btn').addEventListener('click', function() {
-      // Save layout to local storage so that groups.html can access it
-      localStorage.setItem('auditoriumLayout', JSON.stringify({rows, cols, layout}));
-      // Redirect to the groups page
-      window.location.href = 'groups.html';
+    // Add a new division to the layout editor when "Add Division" is clicked
+    document.getElementById('add-division-btn').addEventListener('click', () => {
+      const division = createDivision();
+      document.getElementById('layout-editor').appendChild(division);
+    });
+    
+    // Finalize layout: gather hierarchy data and save it
+    document.getElementById('finalize-btn').addEventListener('click', () => {
+      const layoutData = [];
+      // Iterate through each division
+      document.querySelectorAll('.division').forEach(divisionElem => {
+        const divisionName = divisionElem.querySelector('input[type="text"]').value || "Unnamed Division";
+        const divisionData = { name: divisionName, subdivisions: [] };
+        
+        // Each subdivision in this division
+        divisionElem.querySelectorAll('.subdivision').forEach(subdivisionElem => {
+          const subdivisionName = subdivisionElem.querySelector('input[type="text"]').value || "Unnamed Subdivision";
+          const subdivisionData = { name: subdivisionName, rows: [] };
+          
+          // Each row in this subdivision
+          subdivisionElem.querySelectorAll('.seat-row').forEach(rowElem => {
+            const rowData = [];
+            // Each seat in the row
+            rowElem.querySelectorAll('.seat').forEach(seatElem => {
+              // true if selected (active), false otherwise
+              rowData.push(seatElem.dataset.active === "true");
+            });
+            subdivisionData.rows.push(rowData);
+          });
+          divisionData.subdivisions.push(subdivisionData);
+        });
+        layoutData.push(divisionData);
+      });
+      
+      // Save the layout data to local storage (or send it to a backend)
+      localStorage.setItem('auditoriumRoomLayout', JSON.stringify(layoutData));
+      alert("Layout finalized and saved!");
     });
   </script>
 </body>
