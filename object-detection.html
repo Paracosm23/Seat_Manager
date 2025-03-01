@@ -8,9 +8,7 @@
         font-family: Arial, sans-serif;
         background-color: #121212;
         color: #e0e0e0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        text-align: center;
         padding: 20px;
       }
       #canvas {
@@ -20,29 +18,68 @@
       input[type="file"] {
         margin-top: 20px;
       }
+      #status {
+        margin-top: 10px;
+      }
     </style>
-    <!-- Load TensorFlow.js -->
+    <!-- Load TensorFlow.js and COCO-SSD from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <!-- Load the COCO-SSD model -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
   </head>
   <body>
     <h1>COCO-SSD Object Detection</h1>
     <p>Upload an image to detect objects.</p>
-    <input type="file" id="image-upload">
+    <input type="file" id="image-upload" accept="image/*">
+    <p id="status">Loading model, please wait...</p>
     <canvas id="canvas"></canvas>
     
     <script>
       let model;
+      const statusEl = document.getElementById('status');
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
+      let pendingImage = null; // if an image is uploaded before model loads
 
       // Load the COCO-SSD model
       cocoSsd.load().then(loadedModel => {
         model = loadedModel;
-        console.log("COCO-SSD model loaded.");
+        statusEl.textContent = "Model loaded. Please upload an image.";
+        if (pendingImage) {
+          processImage(pendingImage);
+          pendingImage = null;
+        }
+      }).catch(err => {
+        statusEl.textContent = "Error loading model.";
+        console.error(err);
       });
 
+      // Process the image: draw it on the canvas and run detection
+      function processImage(img) {
+        // Set canvas size to match image
+        canvas.width = img.width;
+        canvas.height = img.height;
+        // Draw the image
+        ctx.drawImage(img, 0, 0);
+        // Run object detection
+        model.detect(img).then(predictions => {
+          predictions.forEach(prediction => {
+            const [x, y, width, height] = prediction.bbox;
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+            ctx.fillStyle = "red";
+            ctx.font = "16px Arial";
+            const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+            ctx.fillText(text, x, y > 10 ? y - 5 : 10);
+          });
+          statusEl.textContent = "Detection complete.";
+        }).catch(err => {
+          console.error("Detection error:", err);
+          statusEl.textContent = "Error during detection.";
+        });
+      }
+
+      // Handle file upload
       document.getElementById('image-upload').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -50,25 +87,12 @@
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
-            // Resize canvas to match image
-            canvas.width = img.width;
-            canvas.height = img.height;
-            // Draw the image on the canvas
-            ctx.drawImage(img, 0, 0);
-            // Run object detection
-            model.detect(img).then(predictions => {
-              console.log(predictions);
-              predictions.forEach(prediction => {
-                const [x, y, width, height] = prediction.bbox;
-                ctx.strokeStyle = "red";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, width, height);
-                ctx.fillStyle = "red";
-                ctx.font = "16px Arial";
-                const text = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
-                ctx.fillText(text, x, y > 10 ? y - 5 : 10);
-              });
-            });
+            if (model) {
+              processImage(img);
+            } else {
+              statusEl.textContent = "Model not loaded yet. Processing image once ready...";
+              pendingImage = img;
+            }
           };
           img.src = event.target.result;
         };
