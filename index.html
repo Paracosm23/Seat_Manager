@@ -98,15 +98,17 @@
       box-sizing: border-box;
       pointer-events: auto;
     }
-    /* Division nameplate that can be dragged freely */
-    .division-nameplate {
-      position: absolute;
-      top: -30px;
-      left: 0;
+    .final-division .division-header {
       background-color: #333;
       padding: 4px;
       font-size: 14px;
       cursor: move;
+      /* This header acts as the draggable area for the entire division */
+    }
+    .final-division .grid-container {
+      position: relative;
+      width: 100%;
+      /* Height grows as rows are added */
     }
     /* ---------- Row Box Styles ---------- */
     .row-box {
@@ -114,26 +116,37 @@
       border: 1px dashed #555;
       background-color: #222;
       cursor: move;
+      overflow: hidden;
     }
-    /* The row number label (to the left of seats) */
+    /* Row label at top-left inside the row box */
     .row-number {
       position: absolute;
-      left: -50px;
       top: 0;
+      left: 0;
       width: 40px;
+      height: 30px;
+      line-height: 30px;
       text-align: right;
       padding-right: 5px;
       font-size: 12px;
-      line-height: 30px;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 2;
     }
-    /* Container for seats inside a row */
+    /* Container for seats inside a row; fills the row box excluding the label */
     .row-content {
-      margin-left: 50px;
-      display: inline-block;
-      white-space: nowrap;
+      position: absolute;
+      top: 0;
+      left: 40px;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 2px;
+      box-sizing: border-box;
     }
     .seat {
-      display: inline-block;
       width: 30px;
       height: 30px;
       margin: 2px;
@@ -143,6 +156,7 @@
       font-size: 0.8em;
       background-color: #2e2e2e;
       color: #e0e0e0;
+      flex-shrink: 0;
     }
     /* Resize handle for row boxes */
     .resize-handle {
@@ -153,6 +167,7 @@
       right: 0;
       bottom: 0;
       cursor: se-resize;
+      z-index: 3;
     }
     /* Rotate handle for row boxes */
     .rotate-handle {
@@ -164,6 +179,7 @@
       right: 0;
       top: 0;
       cursor: grab;
+      z-index: 3;
     }
     /* ---------- Sidebar - Division Config ---------- */
     .division-config {
@@ -302,11 +318,19 @@
       }
     }
     
-    // Make a row box draggable within its division using its row-number as the handle
+    // Make a row box draggable anywhere on its border (we attach the event to the row box itself)
     function makeDraggableRow(rowEl) {
       rowEl.style.position = "absolute";
-      // Ensure row-number exists (it is our handle)
-      makeDraggable(rowEl, '.row-number');
+      // Use the entire border (but exclude resize and rotate handles)
+      rowEl.addEventListener('mousedown', (e) => {
+        // If the event target is a handle, ignore it
+        if (e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) {
+          return;
+        }
+        // Otherwise, start dragging the row
+        // Use the rowEl itself as the handle
+        makeDraggable(rowEl);
+      });
     }
     
     /*********** Resizable Functionality ***********/
@@ -408,7 +432,8 @@
           finalDiv = createFinalDivision(divName, rows);
           box.generatedDivision = finalDiv;
           document.getElementById('seat-overlay').appendChild(finalDiv);
-          makeDraggable(finalDiv, '.division-nameplate');
+          // Make the final division draggable by its header (which now is the entire top border)
+          makeDraggable(finalDiv, '.division-header');
         } else {
           updateFinalDivision(finalDiv, divName, rows);
         }
@@ -458,24 +483,59 @@
     }
     
     /*********** Final Division Box in Main Area ***********/
-    // Create a row box that includes a left row-number label, row-content (with seats),
+    // Create a final division box from division name and an array of row chair counts.
+    function createFinalDivision(divName, rowsArray) {
+      const divBox = document.createElement('div');
+      divBox.classList.add('final-division');
+      divBox.style.left = "50px";
+      divBox.style.top = "50px";
+      
+      // Division header (for dragging the entire division)
+      // The header now spans the full width and acts as the handle.
+      const header = document.createElement('div');
+      header.classList.add('division-header');
+      header.textContent = divName;
+      divBox.appendChild(header);
+      
+      // Container for row boxes (grid container)
+      const gridContainer = document.createElement('div');
+      gridContainer.classList.add('grid-container');
+      gridContainer.style.position = "relative";
+      gridContainer.style.width = "100%";
+      divBox.appendChild(gridContainer);
+      
+      // For each row, create a row-box using createRowBox
+      rowsArray.forEach((numChairs, rowIndex) => {
+        const rowBox = createRowBox(rowIndex, numChairs);
+        gridContainer.appendChild(rowBox);
+      });
+      
+      return divBox;
+    }
+    
+    // Create a row box that includes a left row-number label, a row-content area for seats,
     // a resize handle, and a rotate handle.
     function createRowBox(rowIndex, numChairs) {
       const rowBox = document.createElement('div');
       rowBox.classList.add('row-box');
+      // Initial positioning; user can drag to reposition within the division.
       rowBox.style.left = "0px";
       rowBox.style.top = (rowIndex * 50) + "px";
-      rowBox.style.position = "absolute";
+      rowBox.style.width = (numChairs * 34 + 40) + "px"; // 34px per seat (30+4 margin) plus space for row-number
+      rowBox.style.height = "40px";
       
-      // Row number label
+      // Row number label attached at top-left
       const rowNumber = document.createElement('div');
       rowNumber.classList.add('row-number');
       rowNumber.textContent = "Row " + (rowIndex + 1);
       rowBox.appendChild(rowNumber);
       
-      // Row content container for seats
+      // Row content container: fills the remaining area
       const rowContent = document.createElement('div');
       rowContent.classList.add('row-content');
+      rowContent.style.width = "calc(100% - 40px)";
+      rowContent.style.height = "100%";
+      // Create seat elements (numbering restarts at 1)
       for (let i = 0; i < numChairs; i++) {
         const seat = document.createElement('div');
         seat.classList.add('seat');
@@ -496,49 +556,15 @@
       rowBox.appendChild(rotateHandle);
       makeRotatable(rowBox, rotateHandle);
       
-      // Make the entire row box draggable using its row-number as the handle
+      // Make the row box draggable (using the entire border)
       makeDraggableRow(rowBox);
       
       return rowBox;
     }
     
-    // Create a final division box from division name and an array of row chair counts.
-    function createFinalDivision(divName, rowsArray) {
-      const divBox = document.createElement('div');
-      divBox.classList.add('final-division');
-      divBox.style.left = "50px";
-      divBox.style.top = "50px";
-      
-      // Create a draggable division nameplate
-      const nameplate = document.createElement('div');
-      nameplate.classList.add('division-nameplate');
-      nameplate.textContent = divName;
-      nameplate.style.left = "0px";
-      nameplate.style.top = "-30px";
-      divBox.appendChild(nameplate);
-      makeDraggable(nameplate, null);
-      
-      // Container for row boxes
-      const gridContainer = document.createElement('div');
-      gridContainer.classList.add('grid-container');
-      gridContainer.style.position = "relative";
-      divBox.appendChild(gridContainer);
-      
-      // For each row, create a row box using createRowBox
-      rowsArray.forEach((numChairs, rowIndex) => {
-        const rowBox = createRowBox(rowIndex, numChairs);
-        gridContainer.appendChild(rowBox);
-      });
-      
-      return divBox;
-    }
-    
     // Update an existing final division box with new name and rows configuration.
     function updateFinalDivision(finalDiv, divName, rowsArray) {
-      // Update the division nameplate
-      const nameplate = finalDiv.querySelector('.division-nameplate');
-      nameplate.textContent = divName;
-      
+      finalDiv.querySelector('.division-header').textContent = divName;
       const gridContainer = finalDiv.querySelector('.grid-container');
       gridContainer.innerHTML = "";
       rowsArray.forEach((numChairs, rowIndex) => {
@@ -561,7 +587,7 @@
         const rect = div.getBoundingClientRect();
         const overlayRect = document.getElementById('seat-overlay').getBoundingClientRect();
         divisions.push({
-          name: div.querySelector('.division-nameplate').textContent,
+          name: div.querySelector('.division-header').textContent,
           x: rect.left - overlayRect.left,
           y: rect.top - overlayRect.top,
           width: div.offsetWidth,
