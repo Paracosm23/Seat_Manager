@@ -105,7 +105,7 @@
       // Threshold: assume squares are white on darker background
       let thresh = new cv.Mat();
       // You can adjust 200 -> 128 or other threshold as needed
-      cv.threshold(gray, thresh, 200, 255, cv.THRESH_BINARY);
+      cv.threshold(gray, thresh, 200, 200, cv.THRESH_BINARY);
 
       // Find contours
       let contours = new cv.MatVector();
