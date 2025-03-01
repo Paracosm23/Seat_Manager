@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Layout Editor (Dark Mode) - Enhanced Row Editing</title>
+  <title>Auditorium Layout Editor (Dark Mode) - Enhanced</title>
   <style>
     /* ---------- Global Styles & Dark Mode ---------- */
     body {
@@ -34,14 +34,20 @@
       padding: 10px;
       box-sizing: border-box;
       overflow-y: auto;
-      transition: transform 0.3s ease;
+      transition: width 0.3s ease;
       position: relative;
-      margin-left: 40px; /* leave space for hamburger icon */
+      margin-left: 40px; /* space for hamburger */
     }
-    #sidebar.hidden {
-      transform: translateX(-100%);
+    /* When collapsed, the sidebar shrinks but remains partially visible */
+    #sidebar.collapsed {
+      width: 50px;
     }
-    /* Sidebar tabs */
+    /* Hide sidebar content when collapsed */
+    #sidebar.collapsed .tab-buttons,
+    #sidebar.collapsed .tab-content {
+      display: none;
+    }
+    /* ---------- Sidebar Tabs ---------- */
     .tab-buttons {
       display: flex;
       margin-bottom: 10px;
@@ -81,7 +87,11 @@
       background-position: center;
       margin: 0 auto;
     }
-    /* Overlay for final division boxes */
+    /* Zoom controls in Upload tab */
+    #bg-zoom-container {
+      margin-top: 10px;
+    }
+    /* ---------- Overlay for Final Division Boxes ---------- */
     #seat-overlay {
       position: absolute;
       top: 0;
@@ -98,17 +108,15 @@
       box-sizing: border-box;
       pointer-events: auto;
     }
-    .final-division .division-header {
+    /* Draggable Division Nameplate (separate from box) */
+    .division-nameplate {
+      position: absolute;
+      top: -30px;
+      left: 0;
       background-color: #333;
       padding: 4px;
       font-size: 14px;
       cursor: move;
-      /* This header acts as the draggable area for the entire division */
-    }
-    .final-division .grid-container {
-      position: relative;
-      width: 100%;
-      /* Height grows as rows are added */
     }
     /* ---------- Row Box Styles ---------- */
     .row-box {
@@ -118,7 +126,7 @@
       cursor: move;
       overflow: hidden;
     }
-    /* Row label at top-left inside the row box */
+    /* Row label inside the row box at top left */
     .row-number {
       position: absolute;
       top: 0;
@@ -132,7 +140,7 @@
       background-color: rgba(0,0,0,0.5);
       z-index: 2;
     }
-    /* Container for seats inside a row; fills the row box excluding the label */
+    /* Row content container fills the remainder of the box */
     .row-content {
       position: absolute;
       top: 0;
@@ -158,7 +166,17 @@
       color: #e0e0e0;
       flex-shrink: 0;
     }
-    /* Resize handle for row boxes */
+    /* Resize handle for row boxes – only visible on hover */
+    .resize-handle,
+    .rotate-handle {
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 3;
+    }
+    .row-box:hover .resize-handle,
+    .row-box:hover .rotate-handle {
+      opacity: 1;
+    }
     .resize-handle {
       position: absolute;
       width: 10px;
@@ -167,9 +185,7 @@
       right: 0;
       bottom: 0;
       cursor: se-resize;
-      z-index: 3;
     }
-    /* Rotate handle for row boxes */
     .rotate-handle {
       position: absolute;
       width: 14px;
@@ -179,7 +195,6 @@
       right: 0;
       top: 0;
       cursor: grab;
-      z-index: 3;
     }
     /* ---------- Sidebar - Division Config ---------- */
     .division-config {
@@ -211,6 +226,11 @@
     .row-config span {
       margin-right: 4px;
     }
+    /* New input for row curve */
+    .row-curve-input {
+      width: 50px;
+      margin-left: 4px;
+    }
     /* ---------- Global Finalize Button ---------- */
     #finalize-btn {
       margin-top: 10px;
@@ -238,6 +258,10 @@
       <h3>Upload Background</h3>
       <label for="bg-upload">Choose Image:</label>
       <input type="file" id="bg-upload" accept="image/*">
+      <div id="bg-zoom-container">
+        <label for="bg-zoom">Background Zoom (%):</label>
+        <input type="range" id="bg-zoom" min="50" max="200" value="100">
+      </div>
     </div>
     <div id="divisions-tab" class="tab-content">
       <h3>Division Config</h3>
@@ -275,12 +299,12 @@
       });
     });
     
-    // Toggle sidebar using hamburger icon
+    // Toggle sidebar: collapse to 50px width (content hidden) instead of fully hiding.
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('hidden');
+      document.getElementById('sidebar').classList.toggle('collapsed');
     });
     
-    /*********** Background Image Upload ***********/
+    /*********** Background Image Upload & Zoom ***********/
     document.getElementById('bg-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -291,6 +315,11 @@
         localStorage.setItem('auditoriumBackgroundImage', dataURL);
       };
       reader.readAsDataURL(file);
+    });
+    // Background Zoom: update background-size based on slider value.
+    document.getElementById('bg-zoom').addEventListener('input', function(e) {
+      const zoom = e.target.value;
+      document.getElementById('background-container').style.backgroundSize = zoom + "%";
     });
     
     /*********** Draggable Functionality ***********/
@@ -318,22 +347,16 @@
       }
     }
     
-    // Make a row box draggable anywhere on its border (we attach the event to the row box itself)
+    // Make a row box draggable by its border (excluding handles)
     function makeDraggableRow(rowEl) {
       rowEl.style.position = "absolute";
-      // Use the entire border (but exclude resize and rotate handles)
       rowEl.addEventListener('mousedown', (e) => {
-        // If the event target is a handle, ignore it
-        if (e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) {
-          return;
-        }
-        // Otherwise, start dragging the row
-        // Use the rowEl itself as the handle
+        if (e.target.classList.contains('resize-handle') || e.target.classList.contains('rotate-handle')) return;
         makeDraggable(rowEl);
       });
     }
     
-    /*********** Resizable Functionality ***********/
+    /*********** Resizable & Rotatable Functionality for Rows ***********/
     function makeResizable(el, handle) {
       handle.addEventListener('mousedown', function(e) {
         e.preventDefault();
@@ -354,8 +377,6 @@
         document.documentElement.addEventListener('mouseup', stopDrag, false);
       }, false);
     }
-    
-    /*********** Rotatable Functionality ***********/
     function makeRotatable(el, handle) {
       handle.addEventListener('mousedown', function(e) {
         e.preventDefault();
@@ -410,6 +431,17 @@
       });
       box.appendChild(addRowBtn);
       
+      // Input for Row Curve (border-radius in px)
+      const curveLabel = document.createElement('label');
+      curveLabel.textContent = "Row Curve (px):";
+      box.appendChild(curveLabel);
+      const curveInput = document.createElement('input');
+      curveInput.type = "number";
+      curveInput.value = "0";
+      curveInput.min = "0";
+      curveInput.classList.add('row-curve-input');
+      box.appendChild(curveInput);
+      
       // Button to generate/update final division box in main area
       const genBtn = document.createElement('button');
       genBtn.textContent = "Generate/Update Division";
@@ -426,16 +458,17 @@
           alert("Please add at least one row with a valid number of chairs.");
           return;
         }
+        // Get the row curve value
+        const rowCurve = parseInt(curveInput.value) || 0;
         // Generate or update final division box
         let finalDiv = box.generatedDivision;
         if (!finalDiv) {
-          finalDiv = createFinalDivision(divName, rows);
+          finalDiv = createFinalDivision(divName, rows, rowCurve);
           box.generatedDivision = finalDiv;
           document.getElementById('seat-overlay').appendChild(finalDiv);
-          // Make the final division draggable by its header (which now is the entire top border)
-          makeDraggable(finalDiv, '.division-header');
+          makeDraggable(finalDiv, '.division-header'); // drag division by its header (nameplate)
         } else {
-          updateFinalDivision(finalDiv, divName, rows);
+          updateFinalDivision(finalDiv, divName, rows, rowCurve);
         }
       });
       box.appendChild(genBtn);
@@ -484,58 +517,58 @@
     
     /*********** Final Division Box in Main Area ***********/
     // Create a final division box from division name and an array of row chair counts.
-    function createFinalDivision(divName, rowsArray) {
+    // The rowCurve value (in px) is applied as border-radius to each row box.
+    function createFinalDivision(divName, rowsArray, rowCurve) {
       const divBox = document.createElement('div');
       divBox.classList.add('final-division');
       divBox.style.left = "50px";
       divBox.style.top = "50px";
       
-      // Division header (for dragging the entire division)
-      // The header now spans the full width and acts as the handle.
-      const header = document.createElement('div');
-      header.classList.add('division-header');
-      header.textContent = divName;
-      divBox.appendChild(header);
+      // Create a draggable division header (nameplate) that is separate from the box
+      const nameplate = document.createElement('div');
+      nameplate.classList.add('division-header');
+      nameplate.textContent = divName;
+      nameplate.style.cursor = "move";
+      divBox.appendChild(nameplate);
       
-      // Container for row boxes (grid container)
+      // Container for row boxes
       const gridContainer = document.createElement('div');
       gridContainer.classList.add('grid-container');
       gridContainer.style.position = "relative";
-      gridContainer.style.width = "100%";
       divBox.appendChild(gridContainer);
       
-      // For each row, create a row-box using createRowBox
+      // For each row, create a row-box
       rowsArray.forEach((numChairs, rowIndex) => {
-        const rowBox = createRowBox(rowIndex, numChairs);
+        const rowBox = createRowBox(rowIndex, numChairs, rowCurve);
         gridContainer.appendChild(rowBox);
       });
       
       return divBox;
     }
     
-    // Create a row box that includes a left row-number label, a row-content area for seats,
+    // Create a row box that includes a left row-number label, row-content for seats,
     // a resize handle, and a rotate handle.
-    function createRowBox(rowIndex, numChairs) {
+    // The rowCurve value sets border-radius.
+    function createRowBox(rowIndex, numChairs, rowCurve) {
       const rowBox = document.createElement('div');
       rowBox.classList.add('row-box');
-      // Initial positioning; user can drag to reposition within the division.
       rowBox.style.left = "0px";
       rowBox.style.top = (rowIndex * 50) + "px";
-      rowBox.style.width = (numChairs * 34 + 40) + "px"; // 34px per seat (30+4 margin) plus space for row-number
+      rowBox.style.width = (numChairs * 34 + 40) + "px"; // 34px per seat + 40px for label
       rowBox.style.height = "40px";
+      rowBox.style.borderRadius = rowCurve + "px";
       
-      // Row number label attached at top-left
+      // Row number label attached at top-left inside the box
       const rowNumber = document.createElement('div');
       rowNumber.classList.add('row-number');
       rowNumber.textContent = "Row " + (rowIndex + 1);
       rowBox.appendChild(rowNumber);
       
-      // Row content container: fills the remaining area
+      // Row content container: fills the remainder of the box
       const rowContent = document.createElement('div');
       rowContent.classList.add('row-content');
       rowContent.style.width = "calc(100% - 40px)";
       rowContent.style.height = "100%";
-      // Create seat elements (numbering restarts at 1)
       for (let i = 0; i < numChairs; i++) {
         const seat = document.createElement('div');
         seat.classList.add('seat');
@@ -544,31 +577,31 @@
       }
       rowBox.appendChild(rowContent);
       
-      // Resize handle at bottom-right
+      // Resize handle (bottom-right), only visible on hover
       const resizeHandle = document.createElement('div');
       resizeHandle.classList.add('resize-handle');
       rowBox.appendChild(resizeHandle);
       makeResizable(rowBox, resizeHandle);
       
-      // Rotate handle at top-right
+      // Rotate handle (top-right), only visible on hover
       const rotateHandle = document.createElement('div');
       rotateHandle.classList.add('rotate-handle');
       rowBox.appendChild(rotateHandle);
       makeRotatable(rowBox, rotateHandle);
       
-      // Make the row box draggable (using the entire border)
+      // Make the row box draggable anywhere on its border (excluding handles)
       makeDraggableRow(rowBox);
       
       return rowBox;
     }
     
-    // Update an existing final division box with new name and rows configuration.
-    function updateFinalDivision(finalDiv, divName, rowsArray) {
+    // Update an existing final division box with new name and rows configuration and rowCurve.
+    function updateFinalDivision(finalDiv, divName, rowsArray, rowCurve) {
       finalDiv.querySelector('.division-header').textContent = divName;
       const gridContainer = finalDiv.querySelector('.grid-container');
       gridContainer.innerHTML = "";
       rowsArray.forEach((numChairs, rowIndex) => {
-        const rowBox = createRowBox(rowIndex, numChairs);
+        const rowBox = createRowBox(rowIndex, numChairs, rowCurve);
         gridContainer.appendChild(rowBox);
       });
     }
