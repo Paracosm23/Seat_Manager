@@ -2,9 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Seating Layout Editor - Extended Features</title>
+  <title>Seating Layout Editor - Extended</title>
   <style>
-    /* ---------- Basic Dark Mode Styling ---------- */
+    /* ---------- Global Styles & Dark Mode ---------- */
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -14,7 +14,7 @@
       height: 100vh;
       overflow: hidden;
     }
-    /* ---------- Sidebar & Hamburger ---------- */
+    /* ---------- Fixed Hamburger Icon ---------- */
     #toggle-sidebar-btn {
       position: fixed;
       top: 10px;
@@ -26,6 +26,7 @@
       cursor: pointer;
       z-index: 2000;
     }
+    /* ---------- Sidebar ---------- */
     #sidebar {
       width: 300px;
       background-color: #1e1e1e;
@@ -37,6 +38,7 @@
       position: relative;
       margin-left: 40px;
     }
+    /* When collapsed, sidebar shrinks to 50px (tabs still visible) */
     #sidebar.collapsed {
       width: 50px;
     }
@@ -44,19 +46,20 @@
     #sidebar.collapsed .tab-content {
       display: none;
     }
-    /* ---------- Tabs ---------- */
+    /* ---------- Sidebar Tabs (Vertical) ---------- */
     .tab-buttons {
       display: flex;
+      flex-direction: column;
       margin-bottom: 10px;
     }
     .tab-button {
-      flex: 1;
       padding: 6px;
       background-color: #333;
       border: 1px solid #555;
       cursor: pointer;
-      text-align: center;
+      text-align: left;
       font-size: 14px;
+      margin-bottom: 4px;
     }
     .tab-button.active {
       background-color: #444;
@@ -67,13 +70,16 @@
     .tab-content.active {
       display: block;
     }
-    /* ---------- Main Container ---------- */
+    /* ---------- Main Container ("Layout") ---------- */
     #main-container {
       flex-grow: 1;
       position: relative;
       padding: 10px;
       overflow: auto;
       background-color: #181818;
+    }
+    #main-container h2 {
+      margin-top: 0;
     }
     #background-container {
       position: relative;
@@ -84,130 +90,206 @@
       background-position: center;
       margin: 0 auto;
     }
-    /* ---------- Auditorium Layout Overlay ---------- */
+    /* ---------- Overlay for Final Division Boxes ---------- */
     #seat-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none; /* Divisions are pointer-events: auto */
+      pointer-events: none;
     }
-    /* ---------- Divisions (Final Boxes) ---------- */
-    .division {
+    /* ---------- Final Division Box ---------- */
+    .final-division {
       position: absolute;
       border: 2px solid #888;
       background-color: #1e1e1e;
-      pointer-events: auto;
       box-sizing: border-box;
+      pointer-events: auto;
     }
-    .division .header {
+    .division-nameplate {
+      position: absolute;
+      top: -30px;
+      left: 0;
       background-color: #333;
       padding: 4px;
       font-size: 14px;
-      cursor: move; /* for dragging the division */
+      cursor: move;
     }
-    /* ---------- Rows & Chairs ---------- */
-    .seat-row-container {
-      margin: 5px;
+    /* ---------- Row Box Styles ---------- */
+    .row-box {
+      position: absolute;
       border: 1px dashed #555;
-      padding: 5px;
-      background-color: #2a2a2a;
+      background-color: #222;
+      cursor: move;
+      overflow: hidden;
     }
-    /* ---------- Buttons & Inputs ---------- */
-    button, input[type="file"], input[type="number"], input[type="text"] {
+    .row-number {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 40px;
+      height: 30px;
+      line-height: 30px;
+      text-align: right;
+      padding-right: 5px;
+      font-size: 12px;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+    .row-content {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      padding: 2px;
+      box-sizing: border-box;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-evenly;
+    }
+    .seat {
+      flex: 1 1 0;
+      aspect-ratio: 1;
+      margin: 2px;
+      border: 1px solid #999;
+      text-align: center;
+      line-height: 30px;
+      font-size: 0.8em;
+      background-color: #2e2e2e;
+      color: #e0e0e0;
+    }
+    .resize-handle,
+    .rotate-handle {
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 3;
+    }
+    .row-box:hover .resize-handle,
+    .row-box:hover .rotate-handle {
+      opacity: 1;
+    }
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #e0e0e0;
+      right: 0;
+      bottom: 0;
+      cursor: se-resize;
+    }
+    .rotate-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background-color: #e0e0e0;
+      border-radius: 50%;
+      right: 0;
+      top: 0;
+      cursor: grab;
+    }
+    /* ---------- Sidebar - Division Config ---------- */
+    .division-config {
+      border: 1px solid #888;
+      padding: 8px;
+      margin-bottom: 10px;
+      background-color: #2e2e2e;
+    }
+    .division-config label {
+      display: block;
+      margin-top: 4px;
+    }
+    .division-config input,
+    .division-config button {
       background-color: #333;
       color: #e0e0e0;
       border: 1px solid #555;
       padding: 4px;
       font-size: 12px;
-      margin: 4px 0;
+      margin: 2px 0;
     }
-    #finalize-btn {
-      margin-top: 10px;
-      padding: 6px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      background-color: #333;
-      border: 1px solid #555;
-      color: #e0e0e0;
-    }
-    /* ---------- Row Config Boxes ---------- */
     .row-config {
       border: 1px dashed #555;
       padding: 4px;
       margin: 4px 0;
       background-color: #1a1a1a;
+      cursor: move;
     }
-    /* Example styling for "selected" row config (for copy/paste) */
-    .row-config.selected {
-      outline: 2px solid #ff0;
+    .row-config span {
+      margin-right: 4px;
     }
+    .param-group {
+      display: flex;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .param-group label {
+      flex: 0 0 60px;
+      font-size: 12px;
+    }
+    .param-group input[type="range"] {
+      flex: 1;
+    }
+    .param-group input[type="number"] {
+      width: 50px;
+      margin-left: 4px;
+    }
+    .showname-group {
+      margin-top: 4px;
+    }
+    /* ---------- Global Finalize Button (Removed; Groups Tab used instead) ---------- */
   </style>
 </head>
 <body>
-  <!-- Hamburger to collapse sidebar -->
+  <!-- Fixed Hamburger Icon -->
   <button id="toggle-sidebar-btn">☰</button>
   
-  <!-- Sidebar -->
+  <!-- Sidebar with Vertical Tabs -->
   <div id="sidebar">
     <div class="tab-buttons">
       <div class="tab-button active" data-tab="upload-tab">Upload</div>
       <div class="tab-button" data-tab="divisions-tab">Divisions</div>
       <div class="tab-button" data-tab="groups-tab">Groups</div>
     </div>
-    
-    <!-- UPLOAD TAB -->
     <div id="upload-tab" class="tab-content active">
       <h3>Upload &amp; Config</h3>
-      <label>Upload Background:</label><br>
+      <label for="bg-upload">Upload Background:</label><br>
       <input type="file" id="bg-upload" accept="image/*"><br>
       <p>Scroll over background to zoom</p>
       <hr>
-      <label>Upload Division Config (JSON):</label><br>
+      <label for="upload-config-file">Upload Division Config (JSON):</label><br>
       <input type="file" id="upload-config-file" accept="application/json"><br>
       <button id="download-config-btn">Download Config</button>
     </div>
-    
-    <!-- DIVISIONS TAB -->
     <div id="divisions-tab" class="tab-content">
       <h3>Division Config</h3>
-      <button id="add-division-btn">Add Division</button>
+      <button id="add-division-config-btn">Add Division</button>
       <div id="division-list"></div>
     </div>
-    
-    <!-- GROUPS TAB -->
     <div id="groups-tab" class="tab-content">
       <h3>Groups</h3>
       <p>(Group assignment controls go here.)</p>
     </div>
   </div>
   
-  <!-- Main Container -->
+  <!-- Main Area (Layout) -->
   <div id="main-container">
-    <h2>Main Area</h2>
+    <h2>Layout</h2>
     <div id="background-container">
       <div id="seat-overlay"></div>
     </div>
-    <button id="finalize-btn">Finalize Layout &amp; Proceed to Groups</button>
   </div>
   
   <script>
     /************************************************
-     * 1) Basic Setup & State
+     * 1) Global State, Undo/Redo, Copy/Paste
      ************************************************/
-    let auditoriumData = { divisions: [] }; 
-    // We store the entire layout in memory. We'll sync to localStorage automatically.
-    // For undo/redo we keep a simple history stack:
+    let auditoriumData = { divisions: [] };
     let historyStack = [];
-    // For copy/paste we store a "clipboard" of row or division config
     let clipboard = null;
-    // For selection we store a reference to the "selected" row config element
     let selectedRowConfig = null;
-
-    // Keyboard Shortcuts: Undo (Ctrl+Z), Copy (Ctrl+C), Paste (Ctrl+V)
     document.addEventListener('keydown', function(e) {
-      // Check for OS-specific combos if needed
       const ctrlOrCmd = e.ctrlKey || e.metaKey;
       if (ctrlOrCmd && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -220,26 +302,18 @@
         pasteRowConfig();
       }
     });
-
-    /************************************************
-     * 2) Local Storage & History
-     ************************************************/
     function pushHistory() {
-      // push a deep clone of auditoriumData
       const clone = JSON.parse(JSON.stringify(auditoriumData));
       historyStack.push(clone);
-      if (historyStack.length > 50) {
-        historyStack.shift(); // limit
-      }
+      if (historyStack.length > 50) historyStack.shift();
     }
     function undo() {
       if (historyStack.length === 0) {
         alert("Nothing to undo.");
         return;
       }
-      const prevState = historyStack.pop();
-      auditoriumData = prevState;
-      // re-draw UI
+      auditoriumData = historyStack.pop();
+      saveToLocalStorage();
       renderAll();
     }
     function saveToLocalStorage() {
@@ -253,18 +327,12 @@
         auditoriumData = { divisions: [] };
       }
     }
-
-    /************************************************
-     * 3) Copy/Paste of Row Config
-     ************************************************/
     function copyRowConfig() {
       if (!selectedRowConfig) {
         alert("No row config selected for copy.");
         return;
       }
-      // read its data from dataset or a stored object
-      let rowData = getRowDataFromConfigElement(selectedRowConfig);
-      clipboard = rowData;
+      clipboard = getRowDataFromConfigElement(selectedRowConfig);
       alert("Row config copied.");
     }
     function pasteRowConfig() {
@@ -272,34 +340,76 @@
         alert("Clipboard empty.");
         return;
       }
-      // We'll paste the row config into the same division if possible
-      // or just add it to the first division for demonstration
       if (auditoriumData.divisions.length === 0) {
         alert("No divisions exist to paste into.");
         return;
       }
-      // For simplicity, paste into the first division
       auditoriumData.divisions[0].rows.push(JSON.parse(JSON.stringify(clipboard)));
       pushHistory();
       saveToLocalStorage();
       renderAll();
       alert("Pasted row config into first division.");
     }
-
+    function getRowDataFromConfigElement(elem) {
+      // This demo uses the global auditoriumData structure.
+      let allRowConfigs = document.querySelectorAll('.row-config');
+      let index = Array.from(allRowConfigs).indexOf(elem);
+      let count = 0;
+      for (let d of auditoriumData.divisions) {
+        for (let r of d.rows) {
+          if (count === index) return r;
+          count++;
+        }
+      }
+      return null;
+    }
+    
     /************************************************
-     * 4) Basic UI / Tabs
+     * 2) Sidebar Tabs & Config Upload/Download
      ************************************************/
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(tc => tc.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
     document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('collapsed');
     });
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        // handled above
-      });
+    document.getElementById('download-config-btn').addEventListener('click', () => {
+      let data = JSON.stringify(auditoriumData, null, 2);
+      let blob = new Blob([data], { type: "application/json" });
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement('a');
+      a.href = url;
+      a.download = "division-config.json";
+      a.click();
+      URL.revokeObjectURL(url);
     });
-
+    document.getElementById('upload-config-file').addEventListener('change', (e) => {
+      let file = e.target.files[0];
+      if (!file) return;
+      let reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          auditoriumData = JSON.parse(ev.target.result);
+          pushHistory();
+          saveToLocalStorage();
+          renderAll();
+          alert("Config uploaded and loaded.");
+        } catch(err) {
+          alert("Invalid JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    });
+    
     /************************************************
-     * 5) Background Upload & Zoom
+     * 3) Background Upload & Zoom
      ************************************************/
     const bgContainer = document.getElementById('background-container');
     document.getElementById('bg-upload').addEventListener('change', function(e) {
@@ -312,7 +422,6 @@
       };
       reader.readAsDataURL(file);
     });
-    // Zoom with scroll wheel
     bgContainer.addEventListener('wheel', function(e) {
       e.preventDefault();
       let currentSize = parseFloat(window.getComputedStyle(this).backgroundSize) || 100;
@@ -324,51 +433,12 @@
       }
       this.style.backgroundSize = currentSize + "%";
     });
-
+    
     /************************************************
-     * 6) Download / Upload Division Config
-     ************************************************/
-    document.getElementById('download-config-btn').addEventListener('click', () => {
-      let data = JSON.stringify(auditoriumData, null, 2);
-      let blob = new Blob([data], { type: "application/json" });
-      let url = URL.createObjectURL(blob);
-      let a = document.createElement('a');
-      a.href = url;
-      a.download = "division-config.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-    // Upload config
-    document.getElementById('upload-config-file').addEventListener('change', (e) => {
-      let file = e.target.files[0];
-      if (!file) return;
-      let reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          auditoriumData = JSON.parse(ev.target.result);
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-          alert("Config uploaded & loaded.");
-        } catch(err) {
-          alert("Invalid JSON file.");
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    /************************************************
-     * 7) Divisions UI in Sidebar
+     * 4) Divisions UI in Sidebar (Using Global auditoriumData)
      ************************************************/
     const divisionList = document.getElementById('division-list');
-    document.getElementById('add-division-btn').addEventListener('click', () => {
-      let newDiv = { name: "New Division", rows: [] };
-      auditoriumData.divisions.push(newDiv);
-      pushHistory();
-      saveToLocalStorage();
-      renderAll();
-    });
-
+    // In this demo, divisions are edited via the sidebar config.
     function renderDivisionList() {
       divisionList.innerHTML = "";
       auditoriumData.divisions.forEach((divObj, divIndex) => {
@@ -376,7 +446,6 @@
         divBox.style.border = "1px solid #888";
         divBox.style.padding = "6px";
         divBox.style.marginBottom = "6px";
-
         // Division name input
         let nameInput = document.createElement('input');
         nameInput.type = "text";
@@ -388,7 +457,6 @@
           renderAll();
         });
         divBox.appendChild(nameInput);
-
         // Delete division
         let delBtn = document.createElement('button');
         delBtn.textContent = "Delete";
@@ -399,284 +467,184 @@
           renderAll();
         });
         divBox.appendChild(delBtn);
-
-        // Row list
-        let rowContainer = document.createElement('div');
-        rowContainer.style.marginLeft = "10px";
-        divObj.rows.forEach((rowObj, rowIndex) => {
-          let rowElem = renderRowConfigElement(divIndex, rowIndex);
-          rowContainer.appendChild(rowElem);
-        });
-        divBox.appendChild(rowContainer);
-
-        // Add new row button
-        let addRowBtn = document.createElement('button');
-        addRowBtn.textContent = "Add Row";
-        addRowBtn.addEventListener('click', () => {
-          let newRow = { chairs: 5, rotation: 0, height: 40, offset: 0, showName: true };
-          divObj.rows.push(newRow);
+        // Row list display (brief)
+        let rowInfo = document.createElement('div');
+        rowInfo.textContent = "Rows: " + divObj.rows.length;
+        divBox.appendChild(rowInfo);
+        divisionList.appendChild(divBox);
+      });
+    }
+    
+    /************************************************
+     * 5) Final Division Box Rendering in Layout
+     ************************************************/
+    function renderFinalDivisions() {
+      let overlay = document.getElementById('seat-overlay');
+      overlay.innerHTML = "";
+      auditoriumData.divisions.forEach((divObj, divIndex) => {
+        // Create a final division box based on stored config
+        let finalDiv = createFinalDivision(divObj.name, divObj.rows);
+        // For demonstration, position divisions offset by index:
+        finalDiv.style.left = (50 + divIndex * 40) + "px";
+        finalDiv.style.top = (50 + divIndex * 40) + "px";
+        overlay.appendChild(finalDiv);
+      });
+    }
+    
+    /************************************************
+     * 6) Final Division Box Creation/Update
+     ************************************************/
+    function createFinalDivision(divName, rowsArray) {
+      const divBox = document.createElement('div');
+      divBox.classList.add('final-division');
+      divBox.style.left = "50px";
+      divBox.style.top = "50px";
+      // Draggable division nameplate
+      const nameplate = document.createElement('div');
+      nameplate.classList.add('division-nameplate');
+      nameplate.textContent = divName;
+      nameplate.style.cursor = "move";
+      divBox.appendChild(nameplate);
+      makeDraggable(nameplate);
+      // Container for row boxes
+      const gridContainer = document.createElement('div');
+      gridContainer.classList.add('grid-container');
+      gridContainer.style.position = "relative";
+      divBox.appendChild(gridContainer);
+      // Create row boxes for each row config
+      rowsArray.forEach((rowData, rowIndex) => {
+        const rowBox = createRowBox(rowIndex, rowData);
+        gridContainer.appendChild(rowBox);
+      });
+      return divBox;
+    }
+    function createRowBox(rowIndex, rowData) {
+      const rowBox = document.createElement('div');
+      rowBox.classList.add('row-box');
+      rowBox.style.left = "0px";
+      rowBox.style.top = (rowIndex * 50) + "px";
+      const extra = rowData.showName ? 40 : 0;
+      rowBox.style.width = (rowData.chairs * 34 + extra + rowData.offset) + "px";
+      rowBox.style.height = rowData.height + "px";
+      rowBox.style.transform = "rotate(" + rowData.rotation + "deg)";
+      rowBox.setAttribute('data-rotation', rowData.rotation);
+      
+      // If showName, add row number label
+      if (rowData.showName) {
+        const rowNumber = document.createElement('div');
+        rowNumber.classList.add('row-number');
+        rowNumber.textContent = "Row " + (rowIndex + 1);
+        rowBox.appendChild(rowNumber);
+      }
+      // Row content container
+      const rowContent = document.createElement('div');
+      rowContent.classList.add('row-content');
+      rowContent.style.left = rowData.showName ? (40 + rowData.offset) + "px" : rowData.offset + "px";
+      rowContent.style.width = "calc(100% - " + (rowData.showName ? (40 + rowData.offset) : rowData.offset) + "px)";
+      rowContent.style.height = "100%";
+      for (let i = 0; i < rowData.chairs; i++) {
+        const seat = document.createElement('div');
+        seat.classList.add('seat');
+        seat.textContent = (i + 1);
+        rowContent.appendChild(seat);
+      }
+      rowBox.appendChild(rowContent);
+      
+      // Resize and rotate handles (appear on hover)
+      const resizeHandle = document.createElement('div');
+      resizeHandle.classList.add('resize-handle');
+      rowBox.appendChild(resizeHandle);
+      makeResizable(rowBox, resizeHandle);
+      const rotateHandle = document.createElement('div');
+      rotateHandle.classList.add('rotate-handle');
+      rowBox.appendChild(rotateHandle);
+      makeRotatable(rowBox, rotateHandle);
+      
+      // Draggable row box by its border
+      makeDraggableRow(rowBox);
+      return rowBox;
+    }
+    function updateFinalDivision(finalDiv, divName, rowsArray) {
+      finalDiv.querySelector('.division-nameplate').textContent = divName;
+      const gridContainer = finalDiv.querySelector('.grid-container');
+      gridContainer.innerHTML = "";
+      rowsArray.forEach((rowData, rowIndex) => {
+        const rowBox = createRowBox(rowIndex, rowData);
+        gridContainer.appendChild(rowBox);
+      });
+    }
+    
+    /************************************************
+     * 7) Add Division Config Button in Divisions Tab
+     ************************************************/
+    document.getElementById('add-division-config-btn').addEventListener('click', () => {
+      const newConfig = createDivisionConfig();
+      divisionConfigList.appendChild(newConfig);
+    });
+    
+    /************************************************
+     * 8) Render Everything
+     ************************************************/
+    function renderAll() {
+      renderDivisionList();
+      renderFinalDivisions();
+    }
+    function renderDivisionList() {
+      divisionList.innerHTML = "";
+      auditoriumData.divisions.forEach((divObj, divIndex) => {
+        let divBox = document.createElement('div');
+        divBox.style.border = "1px solid #888";
+        divBox.style.padding = "6px";
+        divBox.style.marginBottom = "6px";
+        let nameInput = document.createElement('input');
+        nameInput.type = "text";
+        nameInput.value = divObj.name;
+        nameInput.addEventListener('input', () => {
+          divObj.name = nameInput.value;
           pushHistory();
           saveToLocalStorage();
           renderAll();
         });
-        divBox.appendChild(addRowBtn);
-
+        divBox.appendChild(nameInput);
+        let delBtn = document.createElement('button');
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener('click', () => {
+          auditoriumData.divisions.splice(divIndex, 1);
+          pushHistory();
+          saveToLocalStorage();
+          renderAll();
+        });
+        divBox.appendChild(delBtn);
+        let rowInfo = document.createElement('div');
+        rowInfo.textContent = "Rows: " + divObj.rows.length;
+        divBox.appendChild(rowInfo);
         divisionList.appendChild(divBox);
       });
     }
-
-    // Renders a row config UI element
-    function renderRowConfigElement(divIndex, rowIndex) {
-      let rowObj = auditoriumData.divisions[divIndex].rows[rowIndex];
-      let rowDiv = document.createElement('div');
-      rowDiv.classList.add('row-config');
-      rowDiv.addEventListener('click', (e) => {
-        // manage "selected" for copy/paste
-        e.stopPropagation(); // so we don't trigger parent's click
-        if (selectedRowConfig) {
-          selectedRowConfig.classList.remove('selected');
-        }
-        selectedRowConfig = rowDiv;
-        rowDiv.classList.add('selected');
+    function renderFinalDivisions() {
+      let overlay = document.getElementById('seat-overlay');
+      overlay.innerHTML = "";
+      auditoriumData.divisions.forEach((divObj, divIndex) => {
+        let finalDiv = createFinalDivision(divObj.name, divObj.rows);
+        finalDiv.style.left = (50 + divIndex * 40) + "px";
+        finalDiv.style.top = (50 + divIndex * 40) + "px";
+        overlay.appendChild(finalDiv);
       });
-
-      // Chairs
-      let chairsLabel = document.createElement('span');
-      chairsLabel.textContent = "Chairs:";
-      rowDiv.appendChild(chairsLabel);
-      let chairsInput = document.createElement('input');
-      chairsInput.type = "number";
-      chairsInput.value = rowObj.chairs;
-      chairsInput.min = 1;
-      chairsInput.addEventListener('input', () => {
-        rowObj.chairs = parseInt(chairsInput.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(chairsInput);
-
-      // Rotation
-      let rotGroup = document.createElement('div');
-      rotGroup.classList.add('param-group');
-      let rotLabel = document.createElement('label');
-      rotLabel.textContent = "Rotation:";
-      rotGroup.appendChild(rotLabel);
-      let rotSlider = document.createElement('input');
-      rotSlider.type = "range";
-      rotSlider.min = 0;
-      rotSlider.max = 360;
-      rotSlider.value = rowObj.rotation;
-      rotGroup.appendChild(rotSlider);
-      let rotNum = document.createElement('input');
-      rotNum.type = "number";
-      rotNum.min = 0;
-      rotNum.max = 360;
-      rotNum.value = rowObj.rotation;
-      rotGroup.appendChild(rotNum);
-      rotSlider.addEventListener('input', () => {
-        rotNum.value = rotSlider.value;
-        rowObj.rotation = parseFloat(rotSlider.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rotNum.addEventListener('input', () => {
-        rotSlider.value = rotNum.value;
-        rowObj.rotation = parseFloat(rotNum.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(rotGroup);
-
-      // Height
-      let heightGroup = document.createElement('div');
-      heightGroup.classList.add('param-group');
-      let heightLabel = document.createElement('label');
-      heightLabel.textContent = "Height:";
-      heightGroup.appendChild(heightLabel);
-      let heightSlider = document.createElement('input');
-      heightSlider.type = "range";
-      heightSlider.min = 20;
-      heightSlider.max = 100;
-      heightSlider.value = rowObj.height;
-      heightGroup.appendChild(heightSlider);
-      let heightNum = document.createElement('input');
-      heightNum.type = "number";
-      heightNum.min = 20;
-      heightNum.max = 100;
-      heightNum.value = rowObj.height;
-      heightGroup.appendChild(heightNum);
-      heightSlider.addEventListener('input', () => {
-        heightNum.value = heightSlider.value;
-        rowObj.height = parseFloat(heightSlider.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      heightNum.addEventListener('input', () => {
-        heightSlider.value = heightNum.value;
-        rowObj.height = parseFloat(heightNum.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(heightGroup);
-
-      // Offset
-      let offsetGroup = document.createElement('div');
-      offsetGroup.classList.add('param-group');
-      let offsetLabel = document.createElement('label');
-      offsetLabel.textContent = "Offset:";
-      offsetGroup.appendChild(offsetLabel);
-      let offsetSlider = document.createElement('input');
-      offsetSlider.type = "range";
-      offsetSlider.min = 0;
-      offsetSlider.max = 200;
-      offsetSlider.value = rowObj.offset;
-      offsetGroup.appendChild(offsetSlider);
-      let offsetNum = document.createElement('input');
-      offsetNum.type = "number";
-      offsetNum.min = 0;
-      offsetNum.max = 200;
-      offsetNum.value = rowObj.offset;
-      offsetGroup.appendChild(offsetNum);
-      offsetSlider.addEventListener('input', () => {
-        offsetNum.value = offsetSlider.value;
-        rowObj.offset = parseFloat(offsetSlider.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      offsetNum.addEventListener('input', () => {
-        offsetSlider.value = offsetNum.value;
-        rowObj.offset = parseFloat(offsetNum.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(offsetGroup);
-
-      // Show Name
-      let showNameGroup = document.createElement('div');
-      showNameGroup.classList.add('showname-group');
-      let showNameLabel = document.createElement('label');
-      let chk = document.createElement('input');
-      chk.type = "checkbox";
-      chk.classList.add('showname-checkbox');
-      chk.checked = rowObj.showName;
-      showNameLabel.textContent = " Show Row Name";
-      showNameLabel.prepend(chk);
-      showNameGroup.appendChild(showNameLabel);
-      chk.addEventListener('change', () => {
-        rowObj.showName = chk.checked;
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(showNameGroup);
-
-      // Delete row
-      let delRowBtn = document.createElement('button');
-      delRowBtn.textContent = "Delete Row";
-      delRowBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        auditoriumData.divisions[divIndex].rows.splice(rowIndex, 1);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rowDiv.appendChild(delRowBtn);
-
-      return rowDiv;
     }
-
-    function getRowDataFromConfigElement(elem) {
-      // In a real app, we’d store the row’s data in dataset or read from the global data structure
-      // For demonstration, we do minimal approach: we find the row in the global data by searching
-      // This is not super efficient, but works for small demos
-      let allRowConfigs = document.querySelectorAll('.row-config');
-      let index = Array.from(allRowConfigs).indexOf(elem);
-      // We can attempt to find it by scanning the divisions
-      let count = 0;
-      for (let d of auditoriumData.divisions) {
-        for (let r of d.rows) {
-          if (count === index) return r;
-          count++;
-        }
-      }
-      return null; // not found
-    }
-
+    
     /************************************************
-     * 8) Rendering the Final Divisions (in seat-overlay)
+     * 9) Finalize: Save Data (No Finalize Button; Groups Tab Uses Data)
      ************************************************/
-    function renderAll() {
-      // Re-render the sidebar
-      renderDivisionList();
-      // Re-render the final divisions on seat-overlay
-      let seatOverlay = document.getElementById('seat-overlay');
-      seatOverlay.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, dIndex) => {
-        // Create a division element
-        let divEl = document.createElement('div');
-        divEl.classList.add('division');
-        divEl.style.left = (50 + dIndex * 40) + "px";
-        divEl.style.top = (50 + dIndex * 40) + "px";
-        divEl.style.width = "250px";
-        divEl.style.height = "200px";
-        
-        // Division header
-        let header = document.createElement('div');
-        header.classList.add('header');
-        header.textContent = divObj.name;
-        divEl.appendChild(header);
-        makeDraggable(divEl, '.header');
-
-        // seat rows
-        divObj.rows.forEach((rowObj, rIndex) => {
-          // Just a placeholder for demonstration
-          let rowContainer = document.createElement('div');
-          rowContainer.classList.add('seat-row-container');
-          rowContainer.textContent = `Row: ${rIndex+1}, Chairs: ${rowObj.chairs}`;
-          divEl.appendChild(rowContainer);
-        });
-
-        seatOverlay.appendChild(divEl);
-      });
-    }
-
+    // For this version, data is continuously updated, so no finalize button.
+    
     /************************************************
-     * 9) Finalize & Startup
+     * 10) Undo/Redo & Copy/Paste Shortcuts already defined
      ************************************************/
-    document.getElementById('finalize-btn').addEventListener('click', () => {
-      // Save final to localStorage
-      saveToLocalStorage();
-      alert("Layout finalized and saved! (Redirect to Groups if needed.)");
-      // For demonstration, we do not actually navigate
-    });
-
-    function pushHistory() {
-      // push a deep clone
-      let clone = JSON.parse(JSON.stringify(auditoriumData));
-      historyStack.push(clone);
-      if (historyStack.length > 50) historyStack.shift();
-    }
-    function undo() {
-      if (historyStack.length === 0) {
-        alert("Nothing to undo.");
-        return;
-      }
-      let prev = historyStack.pop();
-      auditoriumData = prev;
-      saveToLocalStorage();
-      renderAll();
-    }
-
-    function saveToLocalStorage() {
-      localStorage.setItem('auditoriumRoomLayout', JSON.stringify(auditoriumData));
-    }
+    // (Undo with Ctrl+Z, Copy with Ctrl+C, Paste with Ctrl+V)
+    
+    /************************************************
+     * 11) Load Stored Data and Render on Startup
+     ************************************************/
     function loadFromLocalStorage() {
       let stored = localStorage.getItem('auditoriumRoomLayout');
       if (stored) {
@@ -685,8 +653,6 @@
         auditoriumData = { divisions: [] };
       }
     }
-
-    // On page load
     window.addEventListener('load', () => {
       loadFromLocalStorage();
       renderAll();
