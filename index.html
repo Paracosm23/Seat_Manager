@@ -14,19 +14,7 @@
       height: 100vh;
       overflow: hidden;
     }
-    /* ---------- Fixed Hamburger Icon ---------- */
-    #toggle-sidebar-btn {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: none;
-      border: none;
-      font-size: 24px;
-      color: #e0e0e0;
-      cursor: pointer;
-      z-index: 2000;
-    }
-    /* ---------- Sidebar ---------- */
+    /* ---------- Sidebar (with header & vertical tabs) ---------- */
     #sidebar {
       width: 300px;
       background-color: #1e1e1e;
@@ -36,17 +24,35 @@
       overflow-y: auto;
       transition: width 0.3s ease;
       position: relative;
-      margin-left: 40px;
+      /* Sidebar header (contains hamburger and title) */
     }
-    /* When collapsed, sidebar shrinks to 50px (tabs still visible) */
     #sidebar.collapsed {
       width: 50px;
     }
-    #sidebar.collapsed .tab-buttons,
-    #sidebar.collapsed .tab-content {
+    /* In collapsed mode, hide tab content */
+    #sidebar.collapsed .tab-content,
+    #sidebar.collapsed .division-config {
       display: none;
     }
-    /* ---------- Sidebar Tabs (Vertical) ---------- */
+    /* Sidebar Header */
+    #sidebar-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    #sidebar-header button {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #e0e0e0;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    #sidebar-header h2 {
+      font-size: 18px;
+      margin: 0;
+    }
+    /* ---------- Sidebar Tabs (Vertical List) ---------- */
     .tab-buttons {
       display: flex;
       flex-direction: column;
@@ -238,15 +244,15 @@
     .showname-group {
       margin-top: 4px;
     }
-    /* ---------- Global Finalize Button (Removed; Groups Tab used instead) ---------- */
   </style>
 </head>
 <body>
-  <!-- Fixed Hamburger Icon -->
-  <button id="toggle-sidebar-btn">☰</button>
-  
-  <!-- Sidebar with Vertical Tabs -->
+  <!-- Sidebar (with header and vertical tabs under hamburger icon) -->
   <div id="sidebar">
+    <div id="sidebar-header">
+      <button id="toggle-sidebar-btn">☰</button>
+      <h2>Menu</h2>
+    </div>
     <div class="tab-buttons">
       <div class="tab-button active" data-tab="upload-tab">Upload</div>
       <div class="tab-button" data-tab="divisions-tab">Divisions</div>
@@ -265,7 +271,7 @@
     <div id="divisions-tab" class="tab-content">
       <h3>Division Config</h3>
       <button id="add-division-config-btn">Add Division</button>
-      <div id="division-list"></div>
+      <div id="division-config-list"></div>
     </div>
     <div id="groups-tab" class="tab-content">
       <h3>Groups</h3>
@@ -283,7 +289,7 @@
   
   <script>
     /************************************************
-     * 1) Global State, Undo/Redo, Copy/Paste
+     * 1) Global State, Undo/Redo, Copy/Paste Shortcuts
      ************************************************/
     let auditoriumData = { divisions: [] };
     let historyStack = [];
@@ -351,7 +357,6 @@
       alert("Pasted row config into first division.");
     }
     function getRowDataFromConfigElement(elem) {
-      // This demo uses the global auditoriumData structure.
       let allRowConfigs = document.querySelectorAll('.row-config');
       let index = Array.from(allRowConfigs).indexOf(elem);
       let count = 0;
@@ -376,9 +381,6 @@
         btn.classList.add('active');
         document.getElementById(btn.dataset.tab).classList.add('active');
       });
-    });
-    document.getElementById('toggle-sidebar-btn').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('collapsed');
     });
     document.getElementById('download-config-btn').addEventListener('click', () => {
       let data = JSON.stringify(auditoriumData, null, 2);
@@ -435,60 +437,33 @@
     });
     
     /************************************************
-     * 4) Divisions UI in Sidebar (Using Global auditoriumData)
+     * 4) Divisions UI in Sidebar
      ************************************************/
-    const divisionList = document.getElementById('division-list');
-    // In this demo, divisions are edited via the sidebar config.
-    function renderDivisionList() {
-      divisionList.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, divIndex) => {
-        let divBox = document.createElement('div');
-        divBox.style.border = "1px solid #888";
-        divBox.style.padding = "6px";
-        divBox.style.marginBottom = "6px";
-        // Division name input
-        let nameInput = document.createElement('input');
-        nameInput.type = "text";
-        nameInput.value = divObj.name;
-        nameInput.addEventListener('input', () => {
-          divObj.name = nameInput.value;
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(nameInput);
-        // Delete division
-        let delBtn = document.createElement('button');
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener('click', () => {
-          auditoriumData.divisions.splice(divIndex, 1);
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(delBtn);
-        // Row list display (brief)
-        let rowInfo = document.createElement('div');
-        rowInfo.textContent = "Rows: " + divObj.rows.length;
-        divBox.appendChild(rowInfo);
-        divisionList.appendChild(divBox);
-      });
-    }
+    const divisionConfigList = document.getElementById('division-config-list');
+    document.getElementById('add-division-config-btn').addEventListener('click', () => {
+      const newConfig = createDivisionConfig();
+      divisionConfigList.appendChild(newConfig);
+    });
     
     /************************************************
      * 5) Final Division Box Rendering in Layout
      ************************************************/
+    function renderDivisionList() {
+      // Optionally render a simple list summary (for now we use divisionConfigList)
+    }
     function renderFinalDivisions() {
       let overlay = document.getElementById('seat-overlay');
       overlay.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, divIndex) => {
-        // Create a final division box based on stored config
+      auditoriumData.divisions.forEach((divObj, dIndex) => {
         let finalDiv = createFinalDivision(divObj.name, divObj.rows);
-        // For demonstration, position divisions offset by index:
-        finalDiv.style.left = (50 + divIndex * 40) + "px";
-        finalDiv.style.top = (50 + divIndex * 40) + "px";
+        finalDiv.style.left = (50 + dIndex * 40) + "px";
+        finalDiv.style.top = (50 + dIndex * 40) + "px";
         overlay.appendChild(finalDiv);
       });
+    }
+    function renderAll() {
+      renderDivisionList();
+      renderFinalDivisions();
     }
     
     /************************************************
@@ -499,23 +474,27 @@
       divBox.classList.add('final-division');
       divBox.style.left = "50px";
       divBox.style.top = "50px";
-      // Draggable division nameplate
+      
+      // Create a draggable division nameplate
       const nameplate = document.createElement('div');
       nameplate.classList.add('division-nameplate');
       nameplate.textContent = divName;
       nameplate.style.cursor = "move";
       divBox.appendChild(nameplate);
       makeDraggable(nameplate);
+      
       // Container for row boxes
       const gridContainer = document.createElement('div');
       gridContainer.classList.add('grid-container');
       gridContainer.style.position = "relative";
       divBox.appendChild(gridContainer);
-      // Create row boxes for each row config
+      
+      // Create row boxes for each row config object
       rowsArray.forEach((rowData, rowIndex) => {
         const rowBox = createRowBox(rowIndex, rowData);
         gridContainer.appendChild(rowBox);
       });
+      
       return divBox;
     }
     function createRowBox(rowIndex, rowData) {
@@ -529,13 +508,14 @@
       rowBox.style.transform = "rotate(" + rowData.rotation + "deg)";
       rowBox.setAttribute('data-rotation', rowData.rotation);
       
-      // If showName, add row number label
+      // Row number label (if enabled)
       if (rowData.showName) {
         const rowNumber = document.createElement('div');
         rowNumber.classList.add('row-number');
         rowNumber.textContent = "Row " + (rowIndex + 1);
         rowBox.appendChild(rowNumber);
       }
+      
       // Row content container
       const rowContent = document.createElement('div');
       rowContent.classList.add('row-content');
@@ -550,18 +530,21 @@
       }
       rowBox.appendChild(rowContent);
       
-      // Resize and rotate handles (appear on hover)
+      // Resize handle
       const resizeHandle = document.createElement('div');
       resizeHandle.classList.add('resize-handle');
       rowBox.appendChild(resizeHandle);
       makeResizable(rowBox, resizeHandle);
+      
+      // Rotate handle
       const rotateHandle = document.createElement('div');
       rotateHandle.classList.add('rotate-handle');
       rowBox.appendChild(rotateHandle);
       makeRotatable(rowBox, rotateHandle);
       
-      // Draggable row box by its border
+      // Make row box draggable
       makeDraggableRow(rowBox);
+      
       return rowBox;
     }
     function updateFinalDivision(finalDiv, divName, rowsArray) {
@@ -575,75 +558,7 @@
     }
     
     /************************************************
-     * 7) Add Division Config Button in Divisions Tab
-     ************************************************/
-    document.getElementById('add-division-config-btn').addEventListener('click', () => {
-      const newConfig = createDivisionConfig();
-      divisionConfigList.appendChild(newConfig);
-    });
-    
-    /************************************************
-     * 8) Render Everything
-     ************************************************/
-    function renderAll() {
-      renderDivisionList();
-      renderFinalDivisions();
-    }
-    function renderDivisionList() {
-      divisionList.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, divIndex) => {
-        let divBox = document.createElement('div');
-        divBox.style.border = "1px solid #888";
-        divBox.style.padding = "6px";
-        divBox.style.marginBottom = "6px";
-        let nameInput = document.createElement('input');
-        nameInput.type = "text";
-        nameInput.value = divObj.name;
-        nameInput.addEventListener('input', () => {
-          divObj.name = nameInput.value;
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(nameInput);
-        let delBtn = document.createElement('button');
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener('click', () => {
-          auditoriumData.divisions.splice(divIndex, 1);
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(delBtn);
-        let rowInfo = document.createElement('div');
-        rowInfo.textContent = "Rows: " + divObj.rows.length;
-        divBox.appendChild(rowInfo);
-        divisionList.appendChild(divBox);
-      });
-    }
-    function renderFinalDivisions() {
-      let overlay = document.getElementById('seat-overlay');
-      overlay.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, divIndex) => {
-        let finalDiv = createFinalDivision(divObj.name, divObj.rows);
-        finalDiv.style.left = (50 + divIndex * 40) + "px";
-        finalDiv.style.top = (50 + divIndex * 40) + "px";
-        overlay.appendChild(finalDiv);
-      });
-    }
-    
-    /************************************************
-     * 9) Finalize: Save Data (No Finalize Button; Groups Tab Uses Data)
-     ************************************************/
-    // For this version, data is continuously updated, so no finalize button.
-    
-    /************************************************
-     * 10) Undo/Redo & Copy/Paste Shortcuts already defined
-     ************************************************/
-    // (Undo with Ctrl+Z, Copy with Ctrl+C, Paste with Ctrl+V)
-    
-    /************************************************
-     * 11) Load Stored Data and Render on Startup
+     * 7) Render Everything on Startup
      ************************************************/
     function loadFromLocalStorage() {
       let stored = localStorage.getItem('auditoriumRoomLayout');
