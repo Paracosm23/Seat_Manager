@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Seating Layout Editor - Extended</title>
+  <title>Seating Layout Editor - Extended (Live Updates)</title>
   <style>
     /* ---------- Global Styles & Dark Mode ---------- */
     body {
@@ -300,6 +300,8 @@
     let historyStack = [];
     let clipboard = null;
     let selectedRowConfig = null;
+    
+    // Setup keyboard shortcuts for undo, copy, paste
     document.addEventListener('keydown', function(e) {
       const ctrlOrCmd = e.ctrlKey || e.metaKey;
       if (ctrlOrCmd && e.key.toLowerCase() === 'z') {
@@ -313,11 +315,13 @@
         pasteRowConfig();
       }
     });
+    
     function pushHistory() {
       const clone = JSON.parse(JSON.stringify(auditoriumData));
       historyStack.push(clone);
       if (historyStack.length > 50) historyStack.shift();
     }
+    
     function undo() {
       if (historyStack.length === 0) {
         alert("Nothing to undo.");
@@ -327,9 +331,11 @@
       saveToLocalStorage();
       renderAll();
     }
+    
     function saveToLocalStorage() {
       localStorage.setItem('auditoriumRoomLayout', JSON.stringify(auditoriumData));
     }
+    
     function loadFromLocalStorage() {
       let stored = localStorage.getItem('auditoriumRoomLayout');
       if (stored) {
@@ -338,6 +344,7 @@
         auditoriumData = { divisions: [] };
       }
     }
+    
     function copyRowConfig() {
       if (!selectedRowConfig) {
         alert("No row config selected for copy.");
@@ -346,6 +353,7 @@
       clipboard = getRowDataFromConfigElement(selectedRowConfig);
       alert("Row config copied.");
     }
+    
     function pasteRowConfig() {
       if (!clipboard) {
         alert("Clipboard empty.");
@@ -361,6 +369,7 @@
       renderAll();
       alert("Pasted row config into first division.");
     }
+    
     function getRowDataFromConfigElement(elem) {
       let allRowConfigs = document.querySelectorAll('.row-config');
       let index = Array.from(allRowConfigs).indexOf(elem);
@@ -387,6 +396,7 @@
         document.getElementById(btn.dataset.tab).classList.add('active');
       });
     });
+    
     document.getElementById('download-config-btn').addEventListener('click', () => {
       let data = JSON.stringify(auditoriumData, null, 2);
       let blob = new Blob([data], { type: "application/json" });
@@ -397,6 +407,7 @@
       a.click();
       URL.revokeObjectURL(url);
     });
+    
     document.getElementById('upload-config-file').addEventListener('change', (e) => {
       let file = e.target.files[0];
       if (!file) return;
@@ -442,16 +453,53 @@
     });
     
     /************************************************
-     * 4) Divisions UI in Sidebar (Division Config)
+     * 4) Building the Sidebar DOM for Divisions/Rows
+       + Real-time updating logic
      ************************************************/
     const divisionConfigList = document.getElementById('division-list');
     document.getElementById('add-division-config-btn').addEventListener('click', () => {
-      const newConfig = createDivisionConfig();
-      console.log("Creating new division config...");
-      divisionConfigList.appendChild(newConfig);
+      // Add a new blank Division object to auditoriumData
+      auditoriumData.divisions.push({
+        name: "New Division",
+        rows: []
+      });
+      pushHistory();
+      saveToLocalStorage();
+      renderAll(); // Re-render everything (including sidebar)
     });
     
-    function createDivisionConfig() {
+    // Called whenever a user changes something in the sidebar:
+    // Rebuild auditoriumData from the entire sidebar DOM, then re-render.
+    function rebuildGlobalDataFromUI() {
+      const newData = { divisions: [] };
+      
+      // For each .division-config box in the sidebar:
+      document.querySelectorAll('.division-config').forEach(divConfigEl => {
+        const nameInput = divConfigEl.querySelector('.division-name-input');
+        const divName = nameInput ? nameInput.value.trim() : "Unnamed Division";
+        
+        const rows = [];
+        divConfigEl.querySelectorAll('.row-config').forEach(rowEl => {
+          const chairs = parseInt(rowEl.querySelector('.chairs-input').value) || 1;
+          const rotation = parseFloat(rowEl.querySelector('.rotation-input').value) || 0;
+          const height = parseFloat(rowEl.querySelector('.height-input').value) || 40;
+          const offset = parseFloat(rowEl.querySelector('.offset-input').value) || 0;
+          const showName = rowEl.querySelector('.showname-checkbox').checked;
+          
+          rows.push({ chairs, rotation, height, offset, showName });
+        });
+        
+        newData.divisions.push({ name: divName, rows });
+      });
+      
+      auditoriumData = newData;
+      pushHistory();
+      saveToLocalStorage();
+      renderAll();
+    }
+    
+    // Creates the entire .division-config UI in the sidebar for the given division
+    function buildDivisionConfigUI(divObj, divIndex) {
       const box = document.createElement('div');
       box.classList.add('division-config');
       
@@ -459,22 +507,24 @@
       const nameLabel = document.createElement('label');
       nameLabel.textContent = "Division Name:";
       box.appendChild(nameLabel);
+      
       const nameInput = document.createElement('input');
       nameInput.type = "text";
       nameInput.placeholder = "Division";
+      nameInput.classList.add('division-name-input');
+      nameInput.value = divObj.name || "";
       box.appendChild(nameInput);
+      // Real-time update
+      nameInput.addEventListener('input', rebuildGlobalDataFromUI);
       
       // Delete Division Button
       const delDivBtn = document.createElement('button');
       delDivBtn.textContent = "Delete Division";
       delDivBtn.addEventListener('click', () => {
-        if (box.generatedDivision) {
-          box.generatedDivision.remove();
-        }
-        box.remove();
-        // Remove from global data:
-        // (For simplicity, re-rendering all will update global data)
-        rebuildGlobalDataFromUI();
+        auditoriumData.divisions.splice(divIndex, 1);
+        pushHistory();
+        saveToLocalStorage();
+        renderAll();
       });
       box.appendChild(delDivBtn);
       
@@ -483,123 +533,34 @@
       rowList.classList.add('row-list');
       box.appendChild(rowList);
       
-      // Button to add a new row config
+      // For each row in this division, build the row config
+      divObj.rows.forEach((rObj, rIndex) => {
+        rowList.appendChild(buildRowConfigUI(rObj));
+      });
+      
+      // Button to add a new row
       const addRowBtn = document.createElement('button');
       addRowBtn.textContent = "Add Row";
       addRowBtn.addEventListener('click', () => {
-        const rowConfig = createRowConfig();
-        rowList.appendChild(rowConfig);
+        // Insert a new row object in this division
+        divObj.rows.push({
+          chairs: 5,
+          rotation: 0,
+          height: 40,
+          offset: 0,
+          showName: true
+        });
+        pushHistory();
+        saveToLocalStorage();
+        renderAll();
       });
       box.appendChild(addRowBtn);
-      
-      // Parameter groups for division-level defaults (optional)
-      const rotGroup = document.createElement('div');
-      rotGroup.classList.add('param-group');
-      const rotLabel = document.createElement('label');
-      rotLabel.textContent = "Rotation:";
-      rotGroup.appendChild(rotLabel);
-      const rotSlider = document.createElement('input');
-      rotSlider.type = "range";
-      rotSlider.min = "0";
-      rotSlider.max = "360";
-      rotSlider.value = "0";
-      rotSlider.classList.add('rotation-slider');
-      rotGroup.appendChild(rotSlider);
-      const rotNum = document.createElement('input');
-      rotNum.type = "number";
-      rotNum.min = "0";
-      rotNum.max = "360";
-      rotNum.value = "0";
-      rotNum.classList.add('rotation-input');
-      rotGroup.appendChild(rotNum);
-      rotSlider.addEventListener('input', () => { rotNum.value = rotSlider.value; });
-      rotNum.addEventListener('input', () => { rotSlider.value = rotNum.value; });
-      box.appendChild(rotGroup);
-      
-      const heightGroup = document.createElement('div');
-      heightGroup.classList.add('param-group');
-      const heightLabel = document.createElement('label');
-      heightLabel.textContent = "Height:";
-      heightGroup.appendChild(heightLabel);
-      const heightSlider = document.createElement('input');
-      heightSlider.type = "range";
-      heightSlider.min = "20";
-      heightSlider.max = "100";
-      heightSlider.value = "40";
-      heightSlider.classList.add('height-slider');
-      heightGroup.appendChild(heightSlider);
-      const heightNum = document.createElement('input');
-      heightNum.type = "number";
-      heightNum.min = "20";
-      heightNum.max = "100";
-      heightNum.value = "40";
-      heightNum.classList.add('height-input');
-      heightGroup.appendChild(heightNum);
-      heightSlider.addEventListener('input', () => { heightNum.value = heightSlider.value; });
-      heightNum.addEventListener('input', () => { heightSlider.value = heightNum.value; });
-      box.appendChild(heightGroup);
-      
-      const offsetGroup = document.createElement('div');
-      offsetGroup.classList.add('param-group');
-      const offsetLabel = document.createElement('label');
-      offsetLabel.textContent = "Offset:";
-      offsetGroup.appendChild(offsetLabel);
-      const offsetSlider = document.createElement('input');
-      offsetSlider.type = "range";
-      offsetSlider.min = "0";
-      offsetSlider.max = "200";
-      offsetSlider.value = "0";
-      offsetSlider.classList.add('offset-slider');
-      offsetGroup.appendChild(offsetSlider);
-      const offsetNum = document.createElement('input');
-      offsetNum.type = "number";
-      offsetNum.min = "0";
-      offsetNum.max = "200";
-      offsetNum.value = "0";
-      offsetNum.classList.add('offset-input');
-      offsetGroup.appendChild(offsetNum);
-      offsetSlider.addEventListener('input', () => { offsetNum.value = offsetSlider.value; });
-      offsetNum.addEventListener('input', () => { offsetSlider.value = offsetNum.value; });
-      box.appendChild(offsetGroup);
-      
-      // Button to generate/update final division box
-      const genBtn = document.createElement('button');
-      genBtn.textContent = "Generate/Update Division";
-      genBtn.addEventListener('click', () => {
-        const divName = nameInput.value || "Unnamed Division";
-        let rows = [];
-        rowList.querySelectorAll('.row-config').forEach(rowDiv => {
-          const chairs = parseInt(rowDiv.querySelector('.chairs-input').value);
-          const rotation = parseFloat(rowDiv.querySelector('.rotation-input').value) || 0;
-          const height = parseFloat(rowDiv.querySelector('.height-input').value) || 40;
-          const offset = parseFloat(rowDiv.querySelector('.offset-input').value) || 0;
-          const showName = rowDiv.querySelector('.showname-checkbox').checked;
-          if (!isNaN(chairs) && chairs > 0) {
-            rows.push({ chairs, rotation, height, offset, showName });
-          }
-        });
-        if (rows.length === 0) {
-          alert("Please add at least one row with valid settings.");
-          return;
-        }
-        // Use the division-level parameters (if desired) to override row defaults...
-        // For simplicity, here we keep row-level values.
-        let finalDiv = box.generatedDivision;
-        if (!finalDiv) {
-          finalDiv = createFinalDivision(divName, rows);
-          box.generatedDivision = finalDiv;
-          document.getElementById('seat-overlay').appendChild(finalDiv);
-          makeDraggable(finalDiv, '.division-nameplate');
-        } else {
-          updateFinalDivision(finalDiv, divName, rows);
-        }
-      });
-      box.appendChild(genBtn);
       
       return box;
     }
     
-    function createRowConfig() {
+    // Create the .row-config UI
+    function buildRowConfigUI(rowObj) {
       const rowDiv = document.createElement('div');
       rowDiv.classList.add('row-config');
       rowDiv.setAttribute("draggable", "true");
@@ -608,12 +569,14 @@
       let chairsLabel = document.createElement('span');
       chairsLabel.textContent = "Chairs:";
       rowDiv.appendChild(chairsLabel);
+      
       let chairsInput = document.createElement('input');
       chairsInput.type = "number";
-      chairsInput.value = "5";
+      chairsInput.value = rowObj.chairs || 5;
       chairsInput.min = "1";
       chairsInput.classList.add('chairs-input');
       rowDiv.appendChild(chairsInput);
+      chairsInput.addEventListener('input', rebuildGlobalDataFromUI);
       
       // Rotation controls
       let rotGroup = document.createElement('div');
@@ -621,22 +584,33 @@
       let rotLabel = document.createElement('label');
       rotLabel.textContent = "Rotation:";
       rotGroup.appendChild(rotLabel);
+      
       let rotSlider = document.createElement('input');
       rotSlider.type = "range";
       rotSlider.min = "0";
       rotSlider.max = "360";
-      rotSlider.value = "0";
+      rotSlider.value = rowObj.rotation || 0;
       rotSlider.classList.add('rotation-slider');
       rotGroup.appendChild(rotSlider);
+      
       let rotNum = document.createElement('input');
       rotNum.type = "number";
       rotNum.min = "0";
       rotNum.max = "360";
-      rotNum.value = "0";
+      rotNum.value = rowObj.rotation || 0;
       rotNum.classList.add('rotation-input');
       rotGroup.appendChild(rotNum);
-      rotSlider.addEventListener('input', () => { rotNum.value = rotSlider.value; });
-      rotNum.addEventListener('input', () => { rotSlider.value = rotNum.value; });
+      
+      // sync them
+      rotSlider.addEventListener('input', () => {
+        rotNum.value = rotSlider.value;
+        rebuildGlobalDataFromUI();
+      });
+      rotNum.addEventListener('input', () => {
+        rotSlider.value = rotNum.value;
+        rebuildGlobalDataFromUI();
+      });
+      
       rowDiv.appendChild(rotGroup);
       
       // Height controls
@@ -645,22 +619,32 @@
       let heightLabel = document.createElement('label');
       heightLabel.textContent = "Height:";
       heightGroup.appendChild(heightLabel);
+      
       let heightSlider = document.createElement('input');
       heightSlider.type = "range";
       heightSlider.min = "20";
       heightSlider.max = "100";
-      heightSlider.value = "40";
+      heightSlider.value = rowObj.height || 40;
       heightSlider.classList.add('height-slider');
       heightGroup.appendChild(heightSlider);
+      
       let heightNum = document.createElement('input');
       heightNum.type = "number";
       heightNum.min = "20";
       heightNum.max = "100";
-      heightNum.value = "40";
+      heightNum.value = rowObj.height || 40;
       heightNum.classList.add('height-input');
       heightGroup.appendChild(heightNum);
-      heightSlider.addEventListener('input', () => { heightNum.value = heightSlider.value; });
-      heightNum.addEventListener('input', () => { heightSlider.value = heightNum.value; });
+      
+      heightSlider.addEventListener('input', () => {
+        heightNum.value = heightSlider.value;
+        rebuildGlobalDataFromUI();
+      });
+      heightNum.addEventListener('input', () => {
+        heightSlider.value = heightNum.value;
+        rebuildGlobalDataFromUI();
+      });
+      
       rowDiv.appendChild(heightGroup);
       
       // Offset controls
@@ -669,29 +653,47 @@
       let offsetLabel = document.createElement('label');
       offsetLabel.textContent = "Offset:";
       offsetGroup.appendChild(offsetLabel);
+      
       let offsetSlider = document.createElement('input');
       offsetSlider.type = "range";
       offsetSlider.min = "0";
       offsetSlider.max = "200";
-      offsetSlider.value = "0";
+      offsetSlider.value = rowObj.offset || 0;
       offsetSlider.classList.add('offset-slider');
       offsetGroup.appendChild(offsetSlider);
+      
       let offsetNum = document.createElement('input');
       offsetNum.type = "number";
       offsetNum.min = "0";
       offsetNum.max = "200";
-      offsetNum.value = "0";
+      offsetNum.value = rowObj.offset || 0;
       offsetNum.classList.add('offset-input');
       offsetGroup.appendChild(offsetNum);
-      offsetSlider.addEventListener('input', () => { offsetNum.value = offsetSlider.value; });
-      offsetNum.addEventListener('input', () => { offsetSlider.value = offsetNum.value; });
+      
+      offsetSlider.addEventListener('input', () => {
+        offsetNum.value = offsetSlider.value;
+        rebuildGlobalDataFromUI();
+      });
+      offsetNum.addEventListener('input', () => {
+        offsetSlider.value = offsetNum.value;
+        rebuildGlobalDataFromUI();
+      });
+      
       rowDiv.appendChild(offsetGroup);
       
       // Checkbox for show/hide row name
       let showNameGroup = document.createElement('div');
       showNameGroup.classList.add('showname-group');
       let showNameLabel = document.createElement('label');
-      showNameLabel.innerHTML = '<input type="checkbox" class="showname-checkbox" checked> Show Row Name';
+      
+      let checkbox = document.createElement('input');
+      checkbox.type = "checkbox";
+      checkbox.classList.add('showname-checkbox');
+      checkbox.checked = !!rowObj.showName;
+      checkbox.addEventListener('input', rebuildGlobalDataFromUI);
+      
+      showNameLabel.appendChild(checkbox);
+      showNameLabel.append(" Show Row Name");
       showNameGroup.appendChild(showNameLabel);
       rowDiv.appendChild(showNameGroup);
       
@@ -700,17 +702,21 @@
       delRowBtn.textContent = "Delete Row";
       delRowBtn.addEventListener('click', (e) => { 
         e.stopPropagation();
-        rowDiv.remove(); 
+        // remove row from UI and from data, then re-render
+        rowDiv.remove();
+        rebuildGlobalDataFromUI();
       });
       rowDiv.appendChild(delRowBtn);
       
       // Drag events for reordering row configs
       rowDiv.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData("text/plain", null);
+        e.dataTransfer.setData("text/plain", "");
         rowDiv.classList.add("dragging");
       });
       rowDiv.addEventListener('dragend', () => {
         rowDiv.classList.remove("dragging");
+        // After reordering, rebuild data
+        rebuildGlobalDataFromUI();
       });
       rowDiv.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -730,13 +736,16 @@
     }
     
     /************************************************
-     * 5) Final Division Box Rendering in Layout
+     * 5) Final Division Box Rendering in the Layout
      ************************************************/
     function renderFinalDivisions() {
       let overlay = document.getElementById('seat-overlay');
       overlay.innerHTML = "";
+      
+      // For each division in auditoriumData, create a final-division box
       auditoriumData.divisions.forEach((divObj, dIndex) => {
         let finalDiv = createFinalDivision(divObj.name, divObj.rows);
+        // Offset them a bit so they’re not stacked exactly on top
         finalDiv.style.left = (50 + dIndex * 40) + "px";
         finalDiv.style.top = (50 + dIndex * 40) + "px";
         overlay.appendChild(finalDiv);
@@ -755,18 +764,21 @@
       nameplate.textContent = divName;
       nameplate.style.cursor = "move";
       divBox.appendChild(nameplate);
-      makeDraggable(nameplate);
       
       // Container for row boxes
       const gridContainer = document.createElement('div');
-      gridContainer.classList.add('grid-container');
       gridContainer.style.position = "relative";
       divBox.appendChild(gridContainer);
       
       rowsArray.forEach((rowData, rowIndex) => {
         const rowBox = createRowBox(rowIndex, rowData);
+        // Position them simply below each other (rowIndex * 50)
+        rowBox.style.top = (rowIndex * 55) + "px";
         gridContainer.appendChild(rowBox);
       });
+      
+      // Draggable entire final-division by its nameplate:
+      makeDraggable(divBox, ".division-nameplate");
       
       return divBox;
     }
@@ -774,13 +786,13 @@
     function createRowBox(rowIndex, rowData) {
       const rowBox = document.createElement('div');
       rowBox.classList.add('row-box');
-      rowBox.style.left = "0px";
-      rowBox.style.top = (rowIndex * 50) + "px";
+      
+      // If rowData.showName, add the row number area
       const extra = rowData.showName ? 40 : 0;
-      rowBox.style.width = (rowData.chairs * 34 + extra + rowData.offset) + "px";
+      const totalWidth = (rowData.chairs * 34 + extra + rowData.offset);
+      rowBox.style.width = totalWidth + "px";
       rowBox.style.height = rowData.height + "px";
       rowBox.style.transform = "rotate(" + rowData.rotation + "deg)";
-      rowBox.setAttribute('data-rotation', rowData.rotation);
       
       if (rowData.showName) {
         const rowNumber = document.createElement('div');
@@ -791,9 +803,12 @@
       
       const rowContent = document.createElement('div');
       rowContent.classList.add('row-content');
-      rowContent.style.left = rowData.showName ? (40 + rowData.offset) + "px" : rowData.offset + "px";
+      rowContent.style.left = rowData.showName 
+        ? (40 + rowData.offset) + "px" 
+        : rowData.offset + "px";
       rowContent.style.width = "calc(100% - " + (rowData.showName ? (40 + rowData.offset) : rowData.offset) + "px)";
       rowContent.style.height = "100%";
+      
       for (let i = 0; i < rowData.chairs; i++) {
         const seat = document.createElement('div');
         seat.classList.add('seat');
@@ -802,28 +817,134 @@
       }
       rowBox.appendChild(rowContent);
       
+      // Resize handle
       const resizeHandle = document.createElement('div');
       resizeHandle.classList.add('resize-handle');
       rowBox.appendChild(resizeHandle);
       makeResizable(rowBox, resizeHandle);
       
+      // Rotate handle
       const rotateHandle = document.createElement('div');
       rotateHandle.classList.add('rotate-handle');
       rowBox.appendChild(rotateHandle);
       makeRotatable(rowBox, rotateHandle);
       
-      makeDraggableRow(rowBox);
+      // Draggable rowBox itself (within the division)
+      makeDraggable(rowBox);
+      
       return rowBox;
     }
     
-    function renderFinalDivisions() {
-      let overlay = document.getElementById('seat-overlay');
-      overlay.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, dIndex) => {
-        let finalDiv = createFinalDivision(divObj.name, divObj.rows);
-        finalDiv.style.left = (50 + dIndex * 40) + "px";
-        finalDiv.style.top = (50 + dIndex * 40) + "px";
-        overlay.appendChild(finalDiv);
+    /************************************************
+     * 6) Utility Functions for Draggable/Resizable
+     ************************************************/
+    function makeDraggable(element, handleSelector) {
+      let handle = handleSelector ? element.querySelector(handleSelector) : element;
+      if (!handle) handle = element;
+      
+      let offsetX, offsetY;
+      handle.addEventListener('mousedown', onMouseDown);
+      
+      function onMouseDown(e) {
+        if (e.button !== 0) return; // left-click only
+        e.preventDefault();
+        offsetX = e.clientX - element.getBoundingClientRect().left;
+        offsetY = e.clientY - element.getBoundingClientRect().top;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+      
+      function onMouseMove(e) {
+        e.preventDefault();
+        element.style.left = (e.clientX - offsetX) + 'px';
+        element.style.top = (e.clientY - offsetY) + 'px';
+      }
+      
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+    }
+    
+    function makeResizable(element, handle) {
+      let startX, startY, startWidth, startHeight;
+      handle.addEventListener('mousedown', onMouseDown);
+      
+      function onMouseDown(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(window.getComputedStyle(element).width, 10);
+        startHeight = parseInt(window.getComputedStyle(element).height, 10);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+      
+      function onMouseMove(e) {
+        e.preventDefault();
+        let newWidth = startWidth + (e.clientX - startX);
+        let newHeight = startHeight + (e.clientY - startY);
+        if (newWidth < 20) newWidth = 20;
+        if (newHeight < 20) newHeight = 20;
+        element.style.width = newWidth + 'px';
+        element.style.height = newHeight + 'px';
+      }
+      
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+    }
+    
+    function makeRotatable(element, handle) {
+      let centerX, centerY, startAngle;
+      
+      handle.addEventListener('mousedown', onMouseDown);
+      
+      function onMouseDown(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const rect = element.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+        startAngle = getAngle(e.clientX, e.clientY);
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+      
+      function onMouseMove(e) {
+        e.preventDefault();
+        let currentAngle = getAngle(e.clientX, e.clientY);
+        let rotation = currentAngle - startAngle;
+        let currentTransform = element.style.transform || 'rotate(0deg)';
+        let currentRotation = parseFloat(currentTransform.replace(/[^\d.\-]/g, '')) || 0;
+        let newRotation = currentRotation + rotation;
+        element.style.transform = `rotate(${newRotation}deg)`;
+        startAngle = currentAngle;
+      }
+      
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      
+      function getAngle(x, y) {
+        let dx = x - centerX;
+        let dy = y - centerY;
+        return Math.atan2(dy, dx) * (180 / Math.PI);
+      }
+    }
+    
+    /************************************************
+     * 7) Rendering Functions (Sidebar & Layout)
+     ************************************************/
+    function renderDivisionList() {
+      divisionConfigList.innerHTML = "";
+      auditoriumData.divisions.forEach((divObj, divIndex) => {
+        divisionConfigList.appendChild(buildDivisionConfigUI(divObj, divIndex));
       });
     }
     
@@ -832,53 +953,19 @@
       renderFinalDivisions();
     }
     
-    function renderDivisionList() {
-      const divisionList = document.getElementById('division-list');
-      divisionList.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, divIndex) => {
-        let divBox = document.createElement('div');
-        divBox.style.border = "1px solid #888";
-        divBox.style.padding = "6px";
-        divBox.style.marginBottom = "6px";
-        let nameInput = document.createElement('input');
-        nameInput.type = "text";
-        nameInput.value = divObj.name;
-        nameInput.addEventListener('input', () => {
-          divObj.name = nameInput.value;
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(nameInput);
-        let delBtn = document.createElement('button');
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener('click', () => {
-          auditoriumData.divisions.splice(divIndex, 1);
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        });
-        divBox.appendChild(delBtn);
-        let rowInfo = document.createElement('div');
-        rowInfo.textContent = "Rows: " + divObj.rows.length;
-        divBox.appendChild(rowInfo);
-        divisionList.appendChild(divBox);
-      });
-    }
-    
     /************************************************
-     * 6) Load and Render on Startup
+     * 8) On Page Load
      ************************************************/
-    function loadFromLocalStorage() {
-      let stored = localStorage.getItem('auditoriumRoomLayout');
-      if (stored) {
-        auditoriumData = JSON.parse(stored);
-      } else {
-        auditoriumData = { divisions: [] };
-      }
-    }
     window.addEventListener('load', () => {
+      // Load config from localStorage, if exists
       loadFromLocalStorage();
+      
+      // Also load background from localStorage if it was saved
+      let bg = localStorage.getItem('auditoriumBackgroundImage');
+      if (bg) {
+        bgContainer.style.backgroundImage = `url(${bg})`;
+      }
+      
       renderAll();
     });
   </script>
