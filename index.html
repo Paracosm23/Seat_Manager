@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Auditorium Editor - Grid & Snap</title>
+  <title>Auditorium Editor - Grid, Snap, Zoom</title>
   <style>
     /* ---------- Global Styles & Dark Mode ---------- */
     body {
@@ -55,50 +55,45 @@
       background-color: #181818;
       position: relative;
     }
-    #background-container {
+    /* Wrapper so we can scale the entire grid & seats together */
+    #zoom-wrapper {
       position: relative;
       width: 1200px;
       height: 800px;
-      margin: 8px auto;
-      border: 1px solid #444;
-      /* --- Make a grid background using repeated lines: --- */
-      background-image:
-        linear-gradient(#333 1px, transparent 1px),
-        linear-gradient(90deg, #333 1px, transparent 1px);
-      background-size: 40px 40px; /* size of each cell in the grid */
-      background-position: 0 0;
+      transform-origin: top left; /* so it zooms from top-left corner */
     }
-    /* The seat-overlay is where final rows/seats appear */
+    /* The container that draws the grid lines */
+    #background-container {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #444;
+      /* We'll generate the grid lines in JS, based on a base grid size. */
+      background-color: #181818;
+      overflow: hidden;
+    }
+    /* The seat-overlay is where final rows/seats appear. 
+       We MUST allow pointer events so user can drag rows. */
     #seat-overlay {
-      pointer-events: none; /* allow dragging inside but not block pointer events */
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
+      pointer-events: none; 
     }
-
-    /* ---------- Division Container (not draggable) ---------- */
-    .division-block {
-      position: relative;
-      padding: 10px;
-      border: 2px solid #888;
-      margin: 10px;
-    }
-    /* ---------- Row Box (draggable, snaps to grid) ---------- */
     .row-box {
       position: absolute;
       border: 1px dashed #888;
       background-color: #222;
-      cursor: move; /* indicates draggable area */
+      cursor: move; /* draggable */
       overflow: hidden;
+      pointer-events: auto; /* necessary so we can drag it */
     }
     .row-box .row-content {
       position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -115,7 +110,13 @@
       line-height: 28px;
       font-size: 0.8em;
     }
-    /* ---------- Collapsible "Settings" panel for each row ---------- */
+    /* ---------- Collapsible row settings in divisions list ---------- */
+    .row-config-header {
+      background-color: #444;
+      margin: 4px 0;
+      padding: 6px;
+      cursor: pointer;
+    }
     .row-settings {
       display: none;
       margin: 4px 0;
@@ -125,12 +126,6 @@
     }
     .row-settings.open {
       display: block;
-    }
-    .row-config-header {
-      background-color: #444;
-      margin: 4px 0;
-      padding: 6px;
-      cursor: pointer;
     }
     /* ---------- param-group ---------- */
     .param-group {
@@ -142,8 +137,7 @@
       flex: 0 0 60px;
       font-size: 13px;
     }
-    .param-group input,
-    .param-group select {
+    .param-group input {
       flex: 1;
       font-size: 13px;
       margin-left: 4px;
@@ -152,7 +146,22 @@
       border: 1px solid #555;
       padding: 4px;
     }
-
+    /* ---------- Zoom Control Buttons ---------- */
+    #zoom-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 5000;
+    }
+    #zoom-controls button {
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      margin-left: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
@@ -162,54 +171,70 @@
       <h2>Menu</h2>
     </div>
     <div class="tab-buttons">
-      <div class="tab-button active" data-tab="upload-tab">Upload</div>
+      <div class="tab-button active" data-tab="settings-tab">Settings</div>
       <div class="tab-button" data-tab="divisions-tab">Divisions</div>
       <div class="tab-button" data-tab="groups-tab">Groups</div>
     </div>
 
-    <!-- UPLOAD TAB -->
-    <div id="upload-tab" class="tab-content active">
-      <h3>Upload &amp; Config</h3>
-      <label for="bg-upload">Upload Background:</label><br>
+    <!-- SETTINGS TAB (was "Upload" tab) -->
+    <div id="settings-tab" class="tab-content active">
+      <h3>Settings</h3>
+      <label for="default-seat-count">Default Seat Count:</label><br>
+      <input type="number" id="default-seat-count" min="1" placeholder="5"><br><br>
+
+      <label for="bg-upload">Upload Background Image:</label><br>
       <input type="file" id="bg-upload" accept="image/*"><br>
-      <small>(Scroll over background to zoom)</small><br><br>
+      <small>(Scroll or use +/– to zoom)</small><br><br>
 
       <label for="upload-config-file">Upload Auditorium Config (JSON):</label><br>
       <input type="file" id="upload-config-file" accept="application/json"><br>
       <button id="download-config-btn">Download Config</button>
     </div>
 
-    <!-- DIVISIONS TAB -->
+    <!-- DIVISIONS TAB (we load a separate HTML in an iframe) -->
     <div id="divisions-tab" class="tab-content">
-      <h3>Divisions</h3>
-      <button id="add-division-btn">Add Division</button>
-      <div id="division-list"></div>
+      <iframe id="divisions-iframe" src="divisions.html" style="width:100%; height:300px; border:none;"></iframe>
     </div>
 
     <!-- GROUPS TAB -->
     <div id="groups-tab" class="tab-content">
       <h3>Groups</h3>
-      <p>(Placeholder for group assignment: You could list seats here and pick group membership, etc.)</p>
+      <p>(Placeholder for group assignment: You could list seats here, pick group membership, etc.)</p>
     </div>
   </div>
 
   <!-- Main Layout Area -->
   <div id="main-container">
-    <h2>Layout - Snap to Grid Demo</h2>
-    <div id="background-container">
+    <h2>Layout - Snap & Zoom Demo</h2>
+    <!-- Zoom control buttons -->
+    <div id="zoom-controls">
+      <button id="zoom-out-btn">-</button>
+      <button id="zoom-in-btn">+</button>
+    </div>
+    <!-- Container that we scale with CSS transform -->
+    <div id="zoom-wrapper">
+      <div id="background-container"></div>
       <div id="seat-overlay"></div>
     </div>
   </div>
 
   <script>
     /****************************************
-     * 1) Global Data & History
+     * 1) Global Data, Zoom, Grid
      ****************************************/
-    let auditoriumData = { divisions: [] };
+    let auditoriumData = {
+      defaultSeatCount: 5, // user can set in "Settings"
+      divisions: []
+    };
     let historyStack = [];
-    let gridSize = 40; // same as .background-size above
+
+    // Zoom factor for #zoom-wrapper
+    let zoomFactor = 1.0;
+    const baseGridSize = 40; // base distance between grid lines (unscaled)
+    const backgroundContainer = document.getElementById('background-container');
     const seatOverlay = document.getElementById('seat-overlay');
 
+    // We call this whenever we change data:
     function pushHistory() {
       const clone = JSON.parse(JSON.stringify(auditoriumData));
       historyStack.push(clone);
@@ -222,41 +247,67 @@
       let stored = localStorage.getItem('auditoriumLayoutData');
       if (stored) {
         auditoriumData = JSON.parse(stored);
-      } else {
-        auditoriumData = { divisions: [] };
-      }
+      } 
     }
 
-    function snapToGrid(value, gridSize) {
-      return Math.round(value / gridSize) * gridSize;
+    // Utility: snap a value to the scaled grid
+    function snapToGrid(value) {
+      let scaledGrid = baseGridSize * zoomFactor;
+      return Math.round(value / scaledGrid) * scaledGrid;
     }
 
     /****************************************
-     * 2) Upload/Download Config + BG
+     * 2) Tab Handling
      ****************************************/
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(tc => tc.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    /****************************************
+     * 3) Settings Tab: default seat count, BG upload, config
+     ****************************************/
+    // Load or set default seat count
+    const defaultSeatCountInput = document.getElementById('default-seat-count');
+    defaultSeatCountInput.addEventListener('change', () => {
+      auditoriumData.defaultSeatCount = parseInt(defaultSeatCountInput.value) || 5;
+      pushHistory();
+      saveToLocalStorage();
+    });
+
+    // BG upload
     document.getElementById('bg-upload').addEventListener('change', function(e) {
       let file = e.target.files[0];
       if (!file) return;
       let reader = new FileReader();
       reader.onload = function(ev) {
-        document.getElementById('background-container').style.backgroundImage = `url(${ev.target.result})`;
+        backgroundContainer.style.backgroundImage = `url(${ev.target.result})`;
         localStorage.setItem('auditoriumBackgroundImage', ev.target.result);
       };
       reader.readAsDataURL(file);
     });
-    document.getElementById('background-container').addEventListener('wheel', (e) => {
-      e.preventDefault();
-      let bc = document.getElementById('background-container');
-      let currentSize = parseFloat(window.getComputedStyle(bc).backgroundSize) || 100;
-      if (e.deltaY < 0) {
-        currentSize += 10;
-      } else {
-        currentSize -= 10;
-        if (currentSize < 30) currentSize = 30;
-      }
-      bc.style.backgroundSize = currentSize + "%";
-    });
 
+    // Wheel scroll for zoom (optional – can also use +/- buttons)
+    document.getElementById('zoom-wrapper').addEventListener('wheel', function(e) {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        // Zoom in
+        zoomFactor += 0.05;
+      } else {
+        // Zoom out
+        zoomFactor -= 0.05;
+        if (zoomFactor < 0.2) zoomFactor = 0.2;
+      }
+      updateZoom();
+    }, { passive: false });
+
+    // Upload/Download config
     document.getElementById('upload-config-file').addEventListener('change', (e) => {
       let file = e.target.files[0];
       if (!file) return;
@@ -286,276 +337,89 @@
     });
 
     /****************************************
-     * 3) Tabs
+     * 4) Zoom Buttons
      ****************************************/
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
-        tabContents.forEach(tc => tc.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-      });
+    document.getElementById('zoom-in-btn').addEventListener('click', () => {
+      zoomFactor += 0.1;
+      updateZoom();
+    });
+    document.getElementById('zoom-out-btn').addEventListener('click', () => {
+      zoomFactor -= 0.1;
+      if (zoomFactor < 0.1) zoomFactor = 0.1;
+      updateZoom();
     });
 
+    function updateZoom() {
+      // Scale the entire #zoom-wrapper
+      document.getElementById('zoom-wrapper').style.transform = `scale(${zoomFactor})`;
+      // Update the grid background pattern so lines match the scale visually:
+      const scaledGridPx = baseGridSize * zoomFactor;
+      backgroundContainer.style.backgroundSize = `${scaledGridPx}px ${scaledGridPx}px`;
+    }
+
     /****************************************
-     * 4) Divisions and Rows
+     * 5) Building the Divisions & Rows UI
+       (But we moved the Divisions Tab to “divisions.html” via IFRAME)
+       We'll keep functions that the separate file might also call
+       to add rows, etc. if needed.
      ****************************************/
-    document.getElementById('add-division-btn').addEventListener('click', () => {
-      auditoriumData.divisions.push({
-        name: "New Division",
-        rows: []
+
+    // Example function if we need to add a row from external code
+    window.addRowToDivision = function(divIndex) {
+      let d = auditoriumData.divisions[divIndex];
+      if (!d) return;
+      d.rows.push({
+        seats: auditoriumData.defaultSeatCount || 5,
+        rotation: 0,
+        x: 40, 
+        y: 40 + d.rows.length*50,
+        height: 40,
+        offset: 0,
+        curve: 0
       });
       pushHistory();
       saveToLocalStorage();
       renderAll();
-    });
-
-    function buildDivisionUI(divObj, index) {
-      let container = document.createElement('div');
-      container.classList.add('division-block');
-
-      let title = document.createElement('h4');
-      title.textContent = divObj.name || ("Division " + (index + 1));
-      container.appendChild(title);
-
-      // Input to rename division
-      let nameInput = document.createElement('input');
-      nameInput.type = "text";
-      nameInput.value = divObj.name;
-      nameInput.addEventListener('change', () => {
-        divObj.name = nameInput.value;
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      container.appendChild(nameInput);
-
-      // Delete Division
-      let delBtn = document.createElement('button');
-      delBtn.textContent = "Delete Division";
-      delBtn.style.marginLeft = "8px";
-      delBtn.addEventListener('click', () => {
-        auditoriumData.divisions.splice(index, 1);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      container.appendChild(delBtn);
-
-      // Row listing
-      let rowList = document.createElement('div');
-      rowList.style.marginTop = "8px";
-      container.appendChild(rowList);
-
-      divObj.rows.forEach((rowObj, rIndex) => {
-        rowList.appendChild(buildRowUI(rowObj, divObj, rIndex));
-      });
-
-      // Add Row button
-      let addRow = document.createElement('button');
-      addRow.textContent = "Add Row of Seats";
-      addRow.addEventListener('click', () => {
-        divObj.rows.push({
-          seats: 5,
-          rotation: 0,
-          x: 20,  // top-left in the grid
-          y: 20 + divObj.rows.length*50,
-          height: 40,
-          offset: 0,
-          curve: 0
-        });
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      container.appendChild(addRow);
-
-      return container;
-    }
-
-    function buildRowUI(rowObj, divObj, rowIndex) {
-      let rowContainer = document.createElement('div');
-      rowContainer.style.border = "1px solid #555";
-      rowContainer.style.margin = "4px 0";
-      rowContainer.style.padding = "4px";
-
-      // "Header" you can click to toggle the settings
-      let header = document.createElement('div');
-      header.classList.add('row-config-header');
-      header.textContent = "Row #" + (rowIndex + 1) + " - " + (rowObj.seats + " seats");
-      rowContainer.appendChild(header);
-
-      // Collapsible panel for settings
-      let settingsPanel = document.createElement('div');
-      settingsPanel.classList.add('row-settings');
-
-      // “Seats” (renamed from “chairs”)
-      let seatsGroup = document.createElement('div');
-      seatsGroup.classList.add('param-group');
-      let seatsLabel = document.createElement('label');
-      seatsLabel.textContent = "Seats:";
-      seatsGroup.appendChild(seatsLabel);
-
-      let seatsInput = document.createElement('input');
-      seatsInput.type = "number";
-      seatsInput.min = "1";
-      seatsInput.value = rowObj.seats || 1;
-      seatsInput.addEventListener('change', () => {
-        rowObj.seats = parseInt(seatsInput.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      seatsGroup.appendChild(seatsInput);
-      settingsPanel.appendChild(seatsGroup);
-
-      // A “dropdown” for seat styling or seat settings? (As an example, let's do a <select>)
-      let seatStyleGroup = document.createElement('div');
-      seatStyleGroup.classList.add('param-group');
-      let styleLabel = document.createElement('label');
-      styleLabel.textContent = "Seat Style:";
-      seatStyleGroup.appendChild(styleLabel);
-
-      let styleSelect = document.createElement('select');
-      ["Standard", "VIP", "Bench"].forEach(opt => {
-        let o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        styleSelect.appendChild(o);
-      });
-      seatStyleGroup.appendChild(styleSelect);
-      settingsPanel.appendChild(seatStyleGroup);
-
-      // Rotation
-      let rotGroup = document.createElement('div');
-      rotGroup.classList.add('param-group');
-      let rotLabel = document.createElement('label');
-      rotLabel.textContent = "Rotation:";
-      rotGroup.appendChild(rotLabel);
-
-      let rotInput = document.createElement('input');
-      rotInput.type = "range";
-      rotInput.min = "0";
-      rotInput.max = "360";
-      rotInput.value = rowObj.rotation || 0;
-      rotInput.addEventListener('input', () => {
-        rowObj.rotation = parseFloat(rotInput.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      rotGroup.appendChild(rotInput);
-      settingsPanel.appendChild(rotGroup);
-
-      // Height
-      let heightGroup = document.createElement('div');
-      heightGroup.classList.add('param-group');
-      let hLabel = document.createElement('label');
-      hLabel.textContent = "Height:";
-      heightGroup.appendChild(hLabel);
-
-      let hInput = document.createElement('input');
-      hInput.type = "range";
-      hInput.min = "20";
-      hInput.max = "100";
-      hInput.value = rowObj.height || 40;
-      hInput.addEventListener('input', () => {
-        rowObj.height = parseFloat(hInput.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      heightGroup.appendChild(hInput);
-      settingsPanel.appendChild(heightGroup);
-
-      // Curve
-      let curveGroup = document.createElement('div');
-      curveGroup.classList.add('param-group');
-      let cLabel = document.createElement('label');
-      cLabel.textContent = "Curve:";
-      curveGroup.appendChild(cLabel);
-
-      let cInput = document.createElement('input');
-      cInput.type = "range";
-      cInput.min = "0";
-      cInput.max = "50";
-      cInput.value = rowObj.curve || 0;
-      cInput.addEventListener('input', () => {
-        rowObj.curve = parseFloat(cInput.value);
-        pushHistory();
-        saveToLocalStorage();
-        renderAll();
-      });
-      curveGroup.appendChild(cInput);
-      settingsPanel.appendChild(curveGroup);
-
-      // Delete Row
-      let delBtn = document.createElement('button');
-      delBtn.textContent = "Delete Row";
-      delBtn.style.marginTop = "8px";
-      delBtn.addEventListener('click', () => {
-        let idx = divObj.rows.indexOf(rowObj);
-        if (idx >= 0) {
-          divObj.rows.splice(idx, 1);
-          pushHistory();
-          saveToLocalStorage();
-          renderAll();
-        }
-      });
-      settingsPanel.appendChild(delBtn);
-
-      rowContainer.appendChild(settingsPanel);
-
-      // Toggle open/close settings
-      header.addEventListener('click', () => {
-        settingsPanel.classList.toggle('open');
-      });
-
-      return rowContainer;
-    }
+    };
 
     /****************************************
-     * 5) Rendering Final Layout with Snap
+     * 6) Rendering Final Layout (Rows with Snap)
      ****************************************/
     function renderFinalLayout() {
       seatOverlay.innerHTML = "";
+
       auditoriumData.divisions.forEach((divObj, dIndex) => {
-        // We'll just stack divisions visually or let them all share the same space
-        // For example, we ignore div X/Y now (as requested).
-        // We place all row-boxes in seatOverlay:
+        // each row
         divObj.rows.forEach((rowObj, rIndex) => {
           let rowBox = document.createElement('div');
           rowBox.classList.add('row-box');
-
+          // apply rowObj properties
           rowBox.style.left = rowObj.x + "px";
           rowBox.style.top = rowObj.y + "px";
           rowBox.style.width = (rowObj.seats * 30 + 10 + rowObj.curve) + "px";
           rowBox.style.height = rowObj.height + "px";
-          rowBox.style.transform = "rotate(" + (rowObj.rotation || 0) + "deg)";
+          rowBox.style.transform = `rotate(${rowObj.rotation}deg)`;
 
-          // row-content
           let content = document.createElement('div');
           content.classList.add('row-content');
-          // Fill seats:
+          // Fill seats
           for (let i = 0; i < rowObj.seats; i++) {
             let seatDiv = document.createElement('div');
             seatDiv.classList.add('seat');
-            seatDiv.textContent = i+1;
+            seatDiv.textContent = (i+1);
             content.appendChild(seatDiv);
           }
           rowBox.appendChild(content);
 
-          // Make rowBox draggable with snap
-          makeDraggable(rowBox, rowObj);
-
+          // Draggable with grid-snap
+          makeRowDraggable(rowBox, rowObj);
+          
           seatOverlay.appendChild(rowBox);
         });
       });
     }
 
-    function makeDraggable(elem, rowObj) {
+    function makeRowDraggable(elem, rowObj) {
       let startX=0, startY=0, initialX=0, initialY=0;
       elem.addEventListener('mousedown', onMouseDown);
       function onMouseDown(e) {
@@ -573,12 +437,18 @@
         e.preventDefault();
         let dx = e.clientX - startX;
         let dy = e.clientY - startY;
+
+        // Because we have a CSS transform scale, the mouse movement 
+        // is also scaled. So we must invert that scale factor:
+        dx /= zoomFactor;
+        dy /= zoomFactor;
+
         let newX = initialX + dx;
         let newY = initialY + dy;
 
-        // Snap to grid
-        newX = snapToGrid(newX, gridSize);
-        newY = snapToGrid(newY, gridSize);
+        // Snap
+        newX = snapToGrid(newX);
+        newY = snapToGrid(newY);
 
         rowObj.x = newX;
         rowObj.y = newY;
@@ -594,30 +464,31 @@
     }
 
     /****************************************
-     * 6) Render the Sidebar & Layout
+     * 7) Render All
      ****************************************/
     function renderAll() {
-      // Render side menu
-      let divList = document.getElementById('division-list');
-      divList.innerHTML = "";
-      auditoriumData.divisions.forEach((divObj, dIndex) => {
-        divList.appendChild(buildDivisionUI(divObj, dIndex));
-      });
+      // Update the default seat count field
+      defaultSeatCountInput.value = auditoriumData.defaultSeatCount || 5;
 
-      // Render final seat layout
+      // Update background image if stored
+      let bg = localStorage.getItem('auditoriumBackgroundImage');
+      if (bg) {
+        backgroundContainer.style.backgroundImage = `url(${bg})`;
+      } else {
+        backgroundContainer.style.backgroundImage = 'none';
+      }
+
+      // Re-render seat layout
       renderFinalLayout();
     }
 
     /****************************************
-     * 7) On Page Load
+     * 8) On Page Load
      ****************************************/
     window.addEventListener('load', () => {
       loadFromLocalStorage();
-      // Load background image from localStorage if any
-      let bg = localStorage.getItem('auditoriumBackgroundImage');
-      if (bg) {
-        document.getElementById('background-container').style.backgroundImage = `url(${bg})`;
-      }
+      // Init the zoom / background
+      updateZoom();
       renderAll();
     });
   </script>
