@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Divisions - External Page</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #222;
+      color: #ddd;
+      padding: 10px;
+    }
+    button {
+      background-color: #444;
+      color: #ddd;
+      border: 1px solid #666;
+      padding: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h3>Divisions (External File)</h3>
+  <p>This is just a placeholder page loaded via &lt;iframe&gt; in <code>index.html</code>.</p>
+
+  <p>You could add controls here to interact with the main page’s data. For example:</p>
+  <button onclick="addNewDivision()">Add Division (main page)</button>
+  <button onclick="addRowToDivision(0)">Add Row to first Division</button>
+
+  <script>
+    function addNewDivision() {
+      // We can call window.parent to access the main page's JS functions/variables:
+      if(!window.parent.auditoriumData) {
+        alert("Unable to find main page data");
+        return;
+      }
+      // Add a new division to the parent's data:
+      window.parent.auditoriumData.divisions.push({
+        name: "Div from external page",
+        rows: []
+      });
+      window.parent.pushHistory();
+      window.parent.saveToLocalStorage();
+      window.parent.renderAll();
+      alert("Division added in main page!");
+    }
+
+    function addRowToDivision(divIndex) {
+      if(!window.parent.addRowToDivision) {
+        alert("No function addRowToDivision found in parent.");
+        return;
+      }
+      window.parent.addRowToDivision(divIndex);
+      alert("Row added to Division #" + divIndex + " in main page!");
+    }
+  </script>
+</body>
+</html>
